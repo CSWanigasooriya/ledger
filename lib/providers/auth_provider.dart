@@ -55,12 +55,14 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return result != null;
     } on FirebaseAuthException catch (e) {
-      _error = _getAuthErrorMessage(e.code);
+      debugPrint('Google sign-in FirebaseAuth error: ${e.code} - ${e.message}');
+      _error = 'Auth error (${e.code}): ${e.message}';
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      _error = 'Google sign-in failed. Please try again';
+      debugPrint('Google sign-in error: $e');
+      _error = 'Google sign-in failed: $e';
       _isLoading = false;
       notifyListeners();
       return false;
