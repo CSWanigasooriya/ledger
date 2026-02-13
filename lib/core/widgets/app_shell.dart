@@ -90,16 +90,12 @@ class _DesktopLayout extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [colorScheme.primary, colorScheme.tertiary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           Icons.auto_stories_rounded,
-                          color: colorScheme.onPrimary,
+                          color: colorScheme.onPrimaryContainer,
                           size: 22,
                         ),
                       ),
@@ -212,19 +208,12 @@ class _TabletLayout extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary,
-                      Theme.of(context).colorScheme.tertiary,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.auto_stories_rounded,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
                   size: 22,
                 ),
               ),
@@ -292,12 +281,7 @@ class _MobileLayout extends StatelessWidget {
                 children: [
                   DrawerHeader(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.tertiary,
-                        ],
-                      ),
+                      color: Theme.of(context).colorScheme.primaryContainer,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,7 +289,9 @@ class _MobileLayout extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.auto_stories_rounded,
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
                           size: 36,
                         ),
                         const SizedBox(height: 8),
@@ -313,7 +299,9 @@ class _MobileLayout extends StatelessWidget {
                           'Ledger',
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(
-                                color: Theme.of(context).colorScheme.onPrimary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.w700,
                               ),
                         ),

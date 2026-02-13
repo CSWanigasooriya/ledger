@@ -44,6 +44,29 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final result = await _authService.signInWithGoogle();
+      _isLoading = false;
+      notifyListeners();
+      return result != null;
+    } on FirebaseAuthException catch (e) {
+      _error = _getAuthErrorMessage(e.code);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Google sign-in failed. Please try again';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> signOut() async {
     await _authService.signOut();
   }
@@ -65,6 +88,8 @@ class AuthProvider extends ChangeNotifier {
         return 'This account has been disabled';
       case 'too-many-requests':
         return 'Too many attempts. Please try again later';
+      case 'account-exists-with-different-credential':
+        return 'An account already exists with a different sign-in method';
       default:
         return 'Authentication failed. Please try again';
     }

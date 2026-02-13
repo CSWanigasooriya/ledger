@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "976105632132",
+    "project_id": "qr-ledger",
+    "storage_bucket": "qr-ledger.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:976105632132:android:7d811effab2c49e338edd1",
+        "android_client_info": {
+          "package_name": "com.example.ledger"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTvS799RpITnK8oUOUS7bGlrOkAtqraWk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
