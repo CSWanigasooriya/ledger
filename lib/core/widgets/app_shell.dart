@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-class AppShell extends StatelessWidget {
+import 'package:provider/provider.dart';
+import '../../providers/student_provider.dart';
+import '../../providers/teacher_provider.dart';
+import '../../providers/class_provider.dart';
+import '../../providers/expense_provider.dart';
+
+class AppShell extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   const AppShell({super.key, required this.navigationShell});
@@ -18,6 +24,23 @@ class AppShell extends StatelessWidget {
   ];
 
   @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize data providers when the shell (authenticated view) is loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<StudentProvider>().init();
+      context.read<TeacherProvider>().init();
+      context.read<ClassProvider>().init();
+      context.read<ExpenseProvider>().init();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= 1100;
@@ -25,18 +48,18 @@ class AppShell extends StatelessWidget {
 
     if (isDesktop) {
       return _DesktopLayout(
-        navigationShell: navigationShell,
-        destinations: _destinations,
+        navigationShell: widget.navigationShell,
+        destinations: AppShell._destinations,
       );
     } else if (isTablet) {
       return _TabletLayout(
-        navigationShell: navigationShell,
-        destinations: _destinations,
+        navigationShell: widget.navigationShell,
+        destinations: AppShell._destinations,
       );
     } else {
       return _MobileLayout(
-        navigationShell: navigationShell,
-        destinations: _destinations,
+        navigationShell: widget.navigationShell,
+        destinations: AppShell._destinations,
       );
     }
   }

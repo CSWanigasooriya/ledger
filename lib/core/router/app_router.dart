@@ -24,6 +24,7 @@ class AppRouter {
   static GoRouter router(AuthProvider authProvider) {
     return GoRouter(
       initialLocation: '/dashboard',
+      refreshListenable: authProvider,
       redirect: (context, state) {
         final isAuthenticated = authProvider.isAuthenticated;
         final isLoginRoute = state.matchedLocation == '/login';

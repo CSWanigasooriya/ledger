@@ -22,7 +22,9 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
   int _selectedYear = DateTime.now().year;
   List<Student> _students = [];
   List<Payment> _payments = [];
+
   bool _loading = false;
+  String? _error;
 
   Future<void> _loadData() async {
     if (_selectedClassId == null) return;
@@ -34,19 +36,29 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
     final cls = classProv.getClassById(_selectedClassId!);
     if (cls == null) return;
 
-    final students = await studentProv.getStudentsByIds(cls.studentIds);
-    final payments = await _paymentService.getPaymentsByClassAndMonth(
-      _selectedClassId!,
-      _selectedMonth,
-      _selectedYear,
-    );
+    try {
+      final students = await studentProv.getStudentsByIds(cls.studentIds);
+      final payments = await _paymentService.getPaymentsByClassAndMonth(
+        _selectedClassId!,
+        _selectedMonth,
+        _selectedYear,
+      );
 
-    if (mounted) {
-      setState(() {
-        _students = students;
-        _payments = payments;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _students = students;
+          _payments = payments;
+          _loading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load payments: $e';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -231,7 +243,37 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
           ),
           // Students
           Expanded(
-            child: _loading
+            child: _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Something went wrong',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          style: TextStyle(color: colorScheme.error),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _loadData,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _selectedClassId == null
                 ? Center(

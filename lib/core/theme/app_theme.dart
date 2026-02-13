@@ -87,7 +87,7 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 20,
         ),
         labelStyle: textTheme.bodyMedium?.copyWith(
           color: colorScheme.onSurfaceVariant,

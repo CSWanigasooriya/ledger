@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/teacher.dart';
 import '../services/teacher_service.dart';
@@ -13,11 +14,20 @@ class TeacherProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  StreamSubscription? _subscription;
+
   void init() {
-    _service.getTeachersStream().listen((teachers) {
+    _subscription?.cancel();
+    _subscription = _service.getTeachersStream().listen((teachers) {
       _teachers = teachers;
       notifyListeners();
     });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   Future<Teacher?> createTeacher(Teacher teacher) async {

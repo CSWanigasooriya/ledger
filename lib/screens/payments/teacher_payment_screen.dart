@@ -22,6 +22,7 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
   int _selectedYear = DateTime.now().year;
   List<TeacherPayment> _teacherPayments = [];
   bool _loading = false;
+  String? _error;
 
   @override
   void initState() {
@@ -31,15 +32,25 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
 
   Future<void> _loadPayments() async {
     setState(() => _loading = true);
-    final payments = await _teacherPaymentService.getPaymentsByMonth(
-      _selectedMonth,
-      _selectedYear,
-    );
-    if (mounted) {
-      setState(() {
-        _teacherPayments = payments;
-        _loading = false;
-      });
+    try {
+      final payments = await _teacherPaymentService.getPaymentsByMonth(
+        _selectedMonth,
+        _selectedYear,
+      );
+      if (mounted) {
+        setState(() {
+          _teacherPayments = payments;
+          _loading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load payments: $e';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -289,6 +300,36 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Something went wrong',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          style: TextStyle(color: colorScheme.error),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _loadPayments,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
                 : _teacherPayments.isEmpty
                 ? Center(
                     child: Column(

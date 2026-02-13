@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../providers/report_provider.dart';
+import '../../core/widgets/empty_state.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -74,7 +75,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           ),
                         ),
                         SizedBox(
-                          width: 100,
+                          width: 120,
                           child: DropdownButtonFormField<int>(
                             initialValue: _year,
                             decoration: const InputDecoration(
@@ -98,7 +99,20 @@ class _ReportScreenState extends State<ReportScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    if (provider.isLoading)
+                    if (provider.error != null)
+                      Center(
+                        child: EmptyState(
+                          icon: Icons.error_outline_rounded,
+                          title: 'Something went wrong',
+                          subtitle: provider.error,
+                          action: FilledButton.icon(
+                            onPressed: _loadReport,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ),
+                      )
+                    else if (provider.isLoading)
                       const Center(
                         child: Padding(
                           padding: EdgeInsets.all(40),

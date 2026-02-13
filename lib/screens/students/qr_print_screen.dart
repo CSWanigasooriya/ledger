@@ -73,14 +73,7 @@ class QrPrintScreen extends StatelessWidget {
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primary,
-                                colorScheme.tertiary,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: colorScheme.primary,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Icon(
