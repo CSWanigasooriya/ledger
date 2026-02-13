@@ -52,6 +52,6 @@ class ExpenseService {
 
   Future<double> getTotalExpensesForMonth(int month, int year) async {
     final expenses = await getExpensesByMonth(month, year);
-    return expenses.fold(0.0, (sum, e) => sum + e.amount);
+    return expenses.fold<double>(0.0, (total, e) => total + e.amount);
   }
 }

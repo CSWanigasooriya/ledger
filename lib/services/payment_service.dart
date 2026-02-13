@@ -61,7 +61,7 @@ class PaymentService {
     int year,
   ) async {
     final payments = await getPaymentsByClassAndMonth(classId, month, year);
-    return payments.fold(0.0, (sum, p) => sum + p.amount);
+    return payments.fold<double>(0.0, (total, p) => total + p.amount);
   }
 
   Stream<List<Payment>> getPaymentsStream() {

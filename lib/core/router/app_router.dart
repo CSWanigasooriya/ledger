@@ -1,6 +1,4 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../screens/auth/login_screen.dart';
@@ -20,12 +18,10 @@ import '../../screens/payments/class_payment_screen.dart';
 import '../../screens/payments/teacher_payment_screen.dart';
 import '../../screens/expenses/expense_list_screen.dart';
 import '../../screens/expenses/expense_form_screen.dart';
-import '../../screens/reports/reports_screen.dart';
+import '../../screens/reports/report_screen.dart';
 
 class AppRouter {
-  static GoRouter router(BuildContext context) {
-    final authProvider = context.read<AuthProvider>();
-
+  static GoRouter router(AuthProvider authProvider) {
     return GoRouter(
       initialLocation: '/dashboard',
       redirect: (context, state) {
@@ -191,7 +187,7 @@ class AppRouter {
               routes: [
                 GoRoute(
                   path: '/reports',
-                  builder: (context, state) => const ReportsScreen(),
+                  builder: (context, state) => const ReportScreen(),
                 ),
               ],
             ),
