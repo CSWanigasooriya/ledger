@@ -14,23 +14,62 @@ import '../../screens/classes/class_list_screen.dart';
 import '../../screens/classes/class_form_screen.dart';
 import '../../screens/classes/class_detail_screen.dart';
 import '../../screens/attendance/attendance_screen.dart';
+import '../../screens/attendance/attendance_scanner_screen.dart';
 import '../../screens/payments/class_payment_screen.dart';
 import '../../screens/payments/teacher_payment_screen.dart';
 import '../../screens/expenses/expense_list_screen.dart';
 import '../../screens/expenses/expense_form_screen.dart';
 import '../../screens/reports/report_screen.dart';
+import '../../screens/settings/user_management_screen.dart';
 
 class AppRouter {
+  // Routes accessible by role
+  static const _markerAllowedPrefixes = ['/attendance', '/payments'];
+  static const _teacherAllowedPrefixes = [
+    '/classes',
+    '/attendance',
+    '/payments'
+  ];
+
   static GoRouter router(AuthProvider authProvider) {
     return GoRouter(
       initialLocation: '/dashboard',
       refreshListenable: authProvider,
       redirect: (context, state) {
         final isAuthenticated = authProvider.isAuthenticated;
+        final isUnauthorized = authProvider.isUnauthorized;
         final isLoginRoute = state.matchedLocation == '/login';
 
-        if (!isAuthenticated && !isLoginRoute) return '/login';
-        if (isAuthenticated && isLoginRoute) return '/dashboard';
+        // Not authenticated (or unauthorized) → go to login
+        if ((!isAuthenticated || isUnauthorized) && !isLoginRoute) {
+          return '/login';
+        }
+
+        // Authenticated + on login page → redirect to home based on role
+        if (isAuthenticated && !isUnauthorized && isLoginRoute) {
+          if (authProvider.isAdmin) return '/dashboard';
+          if (authProvider.isTeacher) return '/classes';
+          return '/attendance';
+        }
+
+        // Role-based route guard for markers
+        if (isAuthenticated && authProvider.isMarker) {
+          final location = state.matchedLocation;
+          final isAllowed = _markerAllowedPrefixes.any(
+            (prefix) => location.startsWith(prefix),
+          );
+          if (!isAllowed) return '/attendance';
+        }
+
+        // Role-based route guard for teachers
+        if (isAuthenticated && authProvider.isTeacher) {
+          final location = state.matchedLocation;
+          final isAllowed = _teacherAllowedPrefixes.any(
+            (prefix) => location.startsWith(prefix),
+          );
+          if (!isAllowed) return '/classes';
+        }
+
         return null;
       },
       routes: [
@@ -150,6 +189,14 @@ class AppRouter {
                 GoRoute(
                   path: '/attendance',
                   builder: (context, state) => const AttendanceScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'scan/:classId',
+                      builder: (context, state) => AttendanceScannerScreen(
+                        classId: state.pathParameters['classId']!,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -193,6 +240,10 @@ class AppRouter {
               ],
             ),
           ],
+        ),
+        GoRoute(
+          path: '/settings/users',
+          builder: (context, state) => const UserManagementScreen(),
         ),
       ],
     );

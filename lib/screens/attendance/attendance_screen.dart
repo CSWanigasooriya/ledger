@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/attendance.dart';
 import '../../providers/class_provider.dart';
 import '../../providers/student_provider.dart';
@@ -170,6 +171,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   icon: const Icon(Icons.save_rounded, size: 18),
                   label: const Text('Save'),
                 ),
+                // QR Scan Button
+                FilledButton.tonalIcon(
+                  onPressed: _selectedClassId != null
+                      ? () => context.go('/attendance/scan/$_selectedClassId')
+                      : null,
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                  label: const Text('Scan QR'),
+                ),
               ],
             ),
           ),
@@ -179,151 +188,160 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _selectedClassId == null
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.fact_check_rounded,
-                          size: 64,
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Select a class to mark attendance',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  )
-                : _classStudents.isEmpty
-                ? Center(
-                    child: Text(
-                      'No students enrolled in this class',
-                      style: TextStyle(color: colorScheme.onSurfaceVariant),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      // Summary bar
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        child: Row(
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
+                            Icon(
+                              Icons.fact_check_rounded,
+                              size: 64,
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
                             Text(
-                              '${_classStudents.length} students',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Present: ${_attendanceMap.values.where((v) => v).length}',
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Absent: ${_attendanceMap.values.where((v) => !v).length}',
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  for (final key in _attendanceMap.keys) {
-                                    _attendanceMap[key] = true;
-                                  }
-                                });
-                              },
-                              child: const Text('Mark All Present'),
+                              'Select a class to mark attendance',
+                              style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: _classStudents.length,
-                          itemBuilder: (context, index) {
-                            final student = _classStudents[index];
-                            final isPresent =
-                                _attendanceMap[student.id] ?? false;
-
-                            return Card(
-                              child: SwitchListTile(
-                                secondary: CircleAvatar(
-                                  backgroundColor: isPresent
-                                      ? Colors.green.withValues(alpha: 0.15)
-                                      : Colors.red.withValues(alpha: 0.15),
-                                  child: Icon(
-                                    isPresent
-                                        ? Icons.check_circle_rounded
-                                        : Icons.cancel_rounded,
-                                    color: isPresent
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
+                      )
+                    : _classStudents.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No students enrolled in this class',
+                              style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              // Summary bar
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
                                 ),
-                                title: Text(
-                                  student.fullName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '${_classStudents.length} students',
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.green.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Present: ${_attendanceMap.values.where((v) => v).length}',
+                                        style: const TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.red.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Absent: ${_attendanceMap.values.where((v) => !v).length}',
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          for (final key
+                                              in _attendanceMap.keys) {
+                                            _attendanceMap[key] = true;
+                                          }
+                                        });
+                                      },
+                                      child: const Text('Mark All Present'),
+                                    ),
+                                  ],
                                 ),
-                                subtitle: Text(
-                                  isPresent ? 'Present' : 'Absent',
-                                  style: TextStyle(
-                                    color: isPresent
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                ),
-                                value: isPresent,
-                                onChanged: (v) {
-                                  setState(() {
-                                    _attendanceMap[student.id] = v;
-                                  });
-                                },
                               ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                              Expanded(
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20),
+                                  itemCount: _classStudents.length,
+                                  itemBuilder: (context, index) {
+                                    final student = _classStudents[index];
+                                    final isPresent =
+                                        _attendanceMap[student.id] ?? false;
+
+                                    return Card(
+                                      child: SwitchListTile(
+                                        secondary: CircleAvatar(
+                                          backgroundColor: isPresent
+                                              ? Colors.green
+                                                  .withValues(alpha: 0.15)
+                                              : Colors.red
+                                                  .withValues(alpha: 0.15),
+                                          child: Icon(
+                                            isPresent
+                                                ? Icons.check_circle_rounded
+                                                : Icons.cancel_rounded,
+                                            color: isPresent
+                                                ? Colors.green
+                                                : Colors.red,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          student.fullName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          isPresent ? 'Present' : 'Absent',
+                                          style: TextStyle(
+                                            color: isPresent
+                                                ? Colors.green
+                                                : Colors.red,
+                                          ),
+                                        ),
+                                        value: isPresent,
+                                        onChanged: (v) {
+                                          setState(() {
+                                            _attendanceMap[student.id] = v;
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
           ),
         ],
       ),

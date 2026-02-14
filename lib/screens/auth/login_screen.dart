@@ -33,11 +33,11 @@ class _LoginScreenState extends State<LoginScreen>
     );
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
     _animationController.forward();
   }
 
@@ -59,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     if (success && mounted) {
-      context.go('/dashboard');
+      _navigateByRole(authProvider);
     }
   }
 
@@ -68,7 +68,25 @@ class _LoginScreenState extends State<LoginScreen>
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
+      // Wait briefly for role loading
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        _navigateByRole(authProvider);
+      }
+    }
+  }
+
+  void _navigateByRole(AuthProvider authProvider) {
+    if (authProvider.isUnauthorized) {
+      // User has no role — show message, don't navigate
+      return;
+    }
+    if (authProvider.isAdmin) {
       context.go('/dashboard');
+    } else if (authProvider.isTeacher) {
+      context.go('/classes');
+    } else {
+      context.go('/attendance');
     }
   }
 
@@ -194,6 +212,63 @@ class _LoginScreenState extends State<LoginScreen>
                               // Error message
                               Consumer<AuthProvider>(
                                 builder: (context, auth, _) {
+                                  if (auth.isUnauthorized) {
+                                    return Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 16),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.tertiaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.lock_outline_rounded,
+                                                  color: colorScheme
+                                                      .onTertiaryContainer,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Access Pending',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: colorScheme
+                                                        .onTertiaryContainer,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'Your account is not yet authorized. Please contact an administrator to get access.',
+                                              style: TextStyle(
+                                                color: colorScheme
+                                                    .onTertiaryContainer,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: OutlinedButton(
+                                                onPressed: () => auth.signOut(),
+                                                child: const Text(
+                                                    'Sign out and try another account'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }
                                   if (auth.error != null) {
                                     return Padding(
                                       padding: const EdgeInsets.only(
@@ -238,9 +313,8 @@ class _LoginScreenState extends State<LoginScreen>
                               Consumer<AuthProvider>(
                                 builder: (context, auth, _) {
                                   return FilledButton(
-                                    onPressed: auth.isLoading
-                                        ? null
-                                        : _handleLogin,
+                                    onPressed:
+                                        auth.isLoading ? null : _handleLogin,
                                     child: auth.isLoading
                                         ? const SizedBox(
                                             height: 20,
@@ -270,10 +344,10 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     child: Text(
                                       'or',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
                                   ),
                                   Expanded(

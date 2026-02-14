@@ -12,6 +12,7 @@ class AppConstants {
   static const String paymentsCollection = 'payments';
   static const String expensesCollection = 'expenses';
   static const String teacherPaymentsCollection = 'teacher_payments';
+  static const String usersCollection = 'users';
 
   // Expense Types
   static const List<String> expenseTypes = [

@@ -1,22 +1,99 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
 
   User? _user;
+  AppUser? _appUser;
   bool _isLoading = false;
   String? _error;
+  bool _isUnauthorized = false;
+  StreamSubscription? _userDocSubscription;
 
   User? get user => _user;
+  AppUser? get appUser => _appUser;
   bool get isLoading => _isLoading;
-  bool get isAuthenticated => _user != null;
+  bool get isAuthenticated => _user != null && _appUser != null;
+  bool get isUnauthorized => _isUnauthorized;
   String? get error => _error;
+  UserRole? get role => _appUser?.role;
+  bool get isAdmin => _appUser?.isAdmin ?? false;
+  bool get isTeacher => _appUser?.isTeacher ?? false;
+  bool get isMarker => _appUser?.isMarker ?? false;
 
   AuthProvider() {
     _authService.authStateChanges.listen((user) {
       _user = user;
+      if (user != null) {
+        _loadUserRole(user);
+      } else {
+        _appUser = null;
+        _isUnauthorized = false;
+        _userDocSubscription?.cancel();
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> _loadUserRole(User firebaseUser) async {
+    try {
+      // Check if user exists in Firestore
+      final existingUser = await _userService.getUser(firebaseUser.uid);
+
+      if (existingUser != null) {
+        _appUser = existingUser;
+        _isUnauthorized = false;
+        _listenToUserDoc(firebaseUser.uid);
+        notifyListeners();
+        return;
+      }
+
+      // No user doc — check if this is the first user ever
+      final hasUsers = await _userService.hasAnyUsers();
+
+      if (!hasUsers) {
+        // First user becomes admin automatically
+        final newUser = AppUser(
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ?? '',
+          role: UserRole.admin,
+        );
+        await _userService.createUser(newUser);
+        _appUser = newUser;
+        _isUnauthorized = false;
+        _listenToUserDoc(firebaseUser.uid);
+      } else {
+        // Not the first user and no role assigned — unauthorized
+        _appUser = null;
+        _isUnauthorized = true;
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading user role: $e');
+      _error = 'Failed to load user profile';
+      notifyListeners();
+    }
+  }
+
+  void _listenToUserDoc(String uid) {
+    _userDocSubscription?.cancel();
+    _userDocSubscription = _userService.getUserStream(uid).listen((appUser) {
+      if (appUser == null) {
+        // User doc deleted — revoke access
+        _appUser = null;
+        _isUnauthorized = true;
+      } else {
+        _appUser = appUser;
+        _isUnauthorized = false;
+      }
       notifyListeners();
     });
   }
@@ -24,6 +101,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signIn(String email, String password) async {
     _isLoading = true;
     _error = null;
+    _isUnauthorized = false;
     notifyListeners();
 
     try {
@@ -47,6 +125,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _error = null;
+    _isUnauthorized = false;
     notifyListeners();
 
     try {
@@ -70,12 +149,21 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    _userDocSubscription?.cancel();
+    _appUser = null;
+    _isUnauthorized = false;
     await _authService.signOut();
   }
 
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _userDocSubscription?.cancel();
+    super.dispose();
   }
 
   String _getAuthErrorMessage(String code) {
