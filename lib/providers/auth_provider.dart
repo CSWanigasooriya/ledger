@@ -14,6 +14,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   bool _isUnauthorized = false;
+  bool _isInitialized = false;
   StreamSubscription? _userDocSubscription;
 
   User? get user => _user;
@@ -21,6 +22,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null && _appUser != null;
   bool get isUnauthorized => _isUnauthorized;
+  bool get isInitialized => _isInitialized;
   String? get error => _error;
   UserRole? get role => _appUser?.role;
   bool get isAdmin => _appUser?.isAdmin ?? false;
@@ -35,6 +37,7 @@ class AuthProvider extends ChangeNotifier {
       } else {
         _appUser = null;
         _isUnauthorized = false;
+        _isInitialized = true;
         _userDocSubscription?.cancel();
         notifyListeners();
       }
@@ -47,9 +50,16 @@ class AuthProvider extends ChangeNotifier {
       final existingUser = await _userService.getUser(firebaseUser.uid);
 
       if (existingUser != null) {
-        _appUser = existingUser;
-        _isUnauthorized = false;
-        _listenToUserDoc(firebaseUser.uid);
+        if (existingUser.isPending) {
+          _appUser = existingUser;
+          _isUnauthorized = true;
+          _listenToUserDoc(firebaseUser.uid);
+        } else {
+          _appUser = existingUser;
+          _isUnauthorized = false;
+          _listenToUserDoc(firebaseUser.uid);
+        }
+        _isInitialized = true;
         notifyListeners();
         return;
       }
@@ -70,15 +80,26 @@ class AuthProvider extends ChangeNotifier {
         _isUnauthorized = false;
         _listenToUserDoc(firebaseUser.uid);
       } else {
-        // Not the first user and no role assigned — unauthorized
-        _appUser = null;
+        // Not the first user — create as pending so admin can see & assign role
+        final pendingUser = AppUser(
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ?? '',
+          role: UserRole.pending,
+        );
+        await _userService.createUser(pendingUser);
+        _appUser = pendingUser;
         _isUnauthorized = true;
+        // Listen for role changes — when admin assigns a role, this triggers
+        _listenToUserDoc(firebaseUser.uid);
       }
 
+      _isInitialized = true;
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading user role: $e');
       _error = 'Failed to load user profile';
+      _isInitialized = true;
       notifyListeners();
     }
   }
@@ -89,6 +110,9 @@ class AuthProvider extends ChangeNotifier {
       if (appUser == null) {
         // User doc deleted — revoke access
         _appUser = null;
+        _isUnauthorized = true;
+      } else if (appUser.isPending) {
+        _appUser = appUser;
         _isUnauthorized = true;
       } else {
         _appUser = appUser;

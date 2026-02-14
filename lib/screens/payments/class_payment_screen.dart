@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -91,7 +92,11 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: amountController,
-              keyboardType: TextInputType.number,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Amount',
                 prefixIcon: Icon(Icons.payments_outlined),
@@ -173,25 +178,25 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                   child: Consumer<ClassProvider>(
                     builder: (context, classProv, _) =>
                         DropdownButtonFormField<String>(
-                          initialValue: _selectedClassId,
-                          decoration: const InputDecoration(
-                            labelText: 'Select Class',
-                            prefixIcon: Icon(Icons.class_rounded),
-                            isDense: true,
-                          ),
-                          items: classProv.classes
-                              .map(
-                                (c) => DropdownMenuItem(
-                                  value: c.id,
-                                  child: Text(c.className),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            setState(() => _selectedClassId = v);
-                            _loadData();
-                          },
-                        ),
+                      initialValue: _selectedClassId,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Class',
+                        prefixIcon: Icon(Icons.class_rounded),
+                        isDense: true,
+                      ),
+                      items: classProv.classes
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Text(c.className),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        setState(() => _selectedClassId = v);
+                        _loadData();
+                      },
+                    ),
                   ),
                 ),
                 SizedBox(
@@ -218,7 +223,7 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                   ),
                 ),
                 SizedBox(
-                  width: 100,
+                  width: 130,
                   child: DropdownButtonFormField<int>(
                     initialValue: _selectedYear,
                     decoration: const InputDecoration(
@@ -274,135 +279,142 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                     ),
                   )
                 : _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _selectedClassId == null
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.payments_rounded,
-                          size: 64,
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Select a class to manage payments',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  )
-                : Consumer<ClassProvider>(
-                    builder: (context, classProv, _) {
-                      final cls = classProv.getClassById(_selectedClassId!);
-                      final classFees = cls?.classFees ?? 0;
-                      final totalPaid = _payments.fold(
-                        0.0,
-                        (total, p) => total + p.amount,
-                      );
-                      final paidCount = _students
-                          .where((s) => _hasPaid(s.id))
-                          .length;
-
-                      return Column(
-                        children: [
-                          // Summary
-                          Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Row(
+                    ? const Center(child: CircularProgressIndicator())
+                    : _selectedClassId == null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                _buildMiniStat(
-                                  context,
-                                  'Total Collected',
-                                  totalPaid.toStringAsFixed(2),
-                                  Colors.green,
+                                Icon(
+                                  Icons.payments_rounded,
+                                  size: 64,
+                                  color:
+                                      colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
-                                const SizedBox(width: 12),
-                                _buildMiniStat(
-                                  context,
-                                  'Paid',
-                                  '$paidCount/${_students.length}',
-                                  colorScheme.primary,
-                                ),
-                                const SizedBox(width: 12),
-                                _buildMiniStat(
-                                  context,
-                                  'Pending',
-                                  '${_students.length - paidCount}',
-                                  Colors.orange,
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Select a class to manage payments',
+                                  style: TextStyle(
+                                      color: colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ),
-                          ),
-                          Expanded(
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                              ),
-                              itemCount: _students.length,
-                              itemBuilder: (context, index) {
-                                final student = _students[index];
-                                final paid = _hasPaid(student.id);
-                                final paidAmt = _paidAmount(student.id);
+                          )
+                        : Consumer<ClassProvider>(
+                            builder: (context, classProv, _) {
+                              final cls =
+                                  classProv.getClassById(_selectedClassId!);
+                              final classFees = cls?.classFees ?? 0;
+                              final totalPaid = _payments.fold(
+                                0.0,
+                                (total, p) => total + p.amount,
+                              );
+                              final paidCount =
+                                  _students.where((s) => _hasPaid(s.id)).length;
 
-                                return Card(
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: paid
-                                          ? Colors.green.withValues(alpha: 0.15)
-                                          : Colors.orange.withValues(
-                                              alpha: 0.15,
-                                            ),
-                                      child: Icon(
-                                        paid
-                                            ? Icons.check_circle_rounded
-                                            : Icons.pending_rounded,
-                                        color: paid
-                                            ? Colors.green
-                                            : Colors.orange,
-                                      ),
+                              return Column(
+                                children: [
+                                  // Summary
+                                  Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Row(
+                                      children: [
+                                        _buildMiniStat(
+                                          context,
+                                          'Total Collected',
+                                          totalPaid.toStringAsFixed(2),
+                                          Colors.green,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        _buildMiniStat(
+                                          context,
+                                          'Paid',
+                                          '$paidCount/${_students.length}',
+                                          colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        _buildMiniStat(
+                                          context,
+                                          'Pending',
+                                          '${_students.length - paidCount}',
+                                          Colors.orange,
+                                        ),
+                                      ],
                                     ),
-                                    title: Text(
-                                      student.fullName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      paid
-                                          ? 'Paid: ${paidAmt.toStringAsFixed(2)}'
-                                          : 'Pending - Fee: ${classFees.toStringAsFixed(2)}',
-                                    ),
-                                    trailing: paid
-                                        ? Chip(
-                                            label: const Text('Paid'),
-                                            backgroundColor: Colors.green
-                                                .withValues(alpha: 0.1),
-                                            side: BorderSide.none,
-                                            labelStyle: const TextStyle(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          )
-                                        : FilledButton.tonal(
-                                            onPressed: () => _markPayment(
-                                              student,
-                                              classFees,
-                                            ),
-                                            child: const Text('Mark Paid'),
-                                          ),
                                   ),
-                                );
-                              },
-                            ),
+                                  Expanded(
+                                    child: ListView.builder(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                      ),
+                                      itemCount: _students.length,
+                                      itemBuilder: (context, index) {
+                                        final student = _students[index];
+                                        final paid = _hasPaid(student.id);
+                                        final paidAmt = _paidAmount(student.id);
+
+                                        return Card(
+                                          child: ListTile(
+                                            leading: CircleAvatar(
+                                              backgroundColor: paid
+                                                  ? Colors.green
+                                                      .withValues(alpha: 0.15)
+                                                  : Colors.orange.withValues(
+                                                      alpha: 0.15,
+                                                    ),
+                                              child: Icon(
+                                                paid
+                                                    ? Icons.check_circle_rounded
+                                                    : Icons.pending_rounded,
+                                                color: paid
+                                                    ? Colors.green
+                                                    : Colors.orange,
+                                              ),
+                                            ),
+                                            title: Text(
+                                              student.fullName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              paid
+                                                  ? 'Paid: ${paidAmt.toStringAsFixed(2)}'
+                                                  : 'Pending - Fee: ${classFees.toStringAsFixed(2)}',
+                                            ),
+                                            trailing: paid
+                                                ? Chip(
+                                                    label: const Text('Paid'),
+                                                    backgroundColor: Colors
+                                                        .green
+                                                        .withValues(alpha: 0.1),
+                                                    side: BorderSide.none,
+                                                    labelStyle: const TextStyle(
+                                                      color: Colors.green,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  )
+                                                : FilledButton.tonal(
+                                                    onPressed: () =>
+                                                        _markPayment(
+                                                      student,
+                                                      classFees,
+                                                    ),
+                                                    child:
+                                                        const Text('Mark Paid'),
+                                                  ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
-                        ],
-                      );
-                    },
-                  ),
           ),
         ],
       ),
@@ -437,8 +449,8 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ],
         ),

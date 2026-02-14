@@ -136,16 +136,24 @@ class _UserCard extends StatelessWidget {
             // Avatar
             CircleAvatar(
               radius: 22,
-              backgroundColor: user.isAdmin
-                  ? colorScheme.primaryContainer
-                  : colorScheme.tertiaryContainer,
+              backgroundColor: user.isPending
+                  ? colorScheme.errorContainer
+                  : user.isAdmin
+                      ? colorScheme.primaryContainer
+                      : colorScheme.tertiaryContainer,
               child: Icon(
-                user.isAdmin
-                    ? Icons.admin_panel_settings_rounded
-                    : Icons.qr_code_scanner_rounded,
-                color: user.isAdmin
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onTertiaryContainer,
+                user.isPending
+                    ? Icons.hourglass_top_rounded
+                    : user.isAdmin
+                        ? Icons.admin_panel_settings_rounded
+                        : user.isTeacher
+                            ? Icons.school_rounded
+                            : Icons.qr_code_scanner_rounded,
+                color: user.isPending
+                    ? colorScheme.onErrorContainer
+                    : user.isAdmin
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onTertiaryContainer,
                 size: 22,
               ),
             ),
@@ -171,27 +179,40 @@ class _UserCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Role dropdown
-            DropdownButton<UserRole>(
-              value: user.role,
-              underline: const SizedBox.shrink(),
-              borderRadius: BorderRadius.circular(12),
-              items: UserRole.values
-                  .map(
-                    (role) => DropdownMenuItem(
-                      value: role,
-                      child: Text(
-                        role.displayName,
-                        style: theme.textTheme.bodyMedium,
+            // Role dropdown — only show assignable roles (not pending)
+            SizedBox(
+              width: 180,
+              child: DropdownButtonFormField<UserRole>(
+                initialValue: user.isPending ? null : user.role,
+                hint: Text(
+                  'Assign Role',
+                  style: TextStyle(
+                      color: colorScheme.error, fontWeight: FontWeight.w600),
+                ),
+                borderRadius: BorderRadius.circular(12),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: UserRole.values
+                    .where((r) => r != UserRole.pending)
+                    .map(
+                      (role) => DropdownMenuItem(
+                        value: role,
+                        child: Text(
+                          role.displayName,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (role) {
-                if (role != null && role != user.role) {
-                  onRoleChanged(role);
-                }
-              },
+                    )
+                    .toList(),
+                onChanged: (role) {
+                  if (role != null && role != user.role) {
+                    onRoleChanged(role);
+                  }
+                },
+              ),
             ),
             const SizedBox(width: 8),
             // Delete button

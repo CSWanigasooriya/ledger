@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/expense.dart';
@@ -90,7 +91,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _amountController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]')),
+                          ],
                           decoration: const InputDecoration(
                             labelText: 'Amount *',
                             prefixIcon: Icon(Icons.payments_outlined),

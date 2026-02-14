@@ -37,9 +37,8 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
 
   void _loadStudent() {
     final provider = context.read<StudentProvider>();
-    final student = provider.students
-        .where((s) => s.id == widget.studentId)
-        .firstOrNull;
+    final student =
+        provider.students.where((s) => s.id == widget.studentId).firstOrNull;
     if (student != null) {
       _existingStudent = student;
       _firstNameController.text = student.firstName;
@@ -176,7 +175,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           controller: _mobileController,
                           keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
-                            labelText: 'Mobile No',
+                            labelText: 'Mobile Number',
                             prefixIcon: Icon(Icons.phone_outlined),
                           ),
                         ),
@@ -213,7 +212,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           controller: _guardianMobileController,
                           keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
-                            labelText: 'Guardian Mobile No',
+                            labelText: 'Guardian Mobile Number',
                             prefixIcon: Icon(Icons.phone_outlined),
                           ),
                         ),

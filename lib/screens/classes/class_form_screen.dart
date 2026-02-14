@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/class_model.dart';
@@ -34,9 +35,8 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
 
   void _loadClass() {
     final provider = context.read<ClassProvider>();
-    final cls = provider.classes
-        .where((c) => c.id == widget.classId)
-        .firstOrNull;
+    final cls =
+        provider.classes.where((c) => c.id == widget.classId).firstOrNull;
     if (cls != null) {
       _existingClass = cls;
       _classNameController.text = cls.className;
@@ -152,7 +152,12 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _feesController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]')),
+                          ],
                           decoration: const InputDecoration(
                             labelText: 'Class Fees',
                             prefixIcon: Icon(Icons.payments_outlined),
@@ -161,7 +166,12 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _commissionController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]')),
+                          ],
                           decoration: const InputDecoration(
                             labelText: 'Teacher Commission Rate (%)',
                             prefixIcon: Icon(Icons.percent_rounded),

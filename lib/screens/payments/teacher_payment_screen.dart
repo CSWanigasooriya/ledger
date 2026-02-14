@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../models/teacher_payment.dart';
@@ -97,12 +98,12 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                         double totalSales = 0;
                         double totalCommission = 0;
                         for (final cls in classes) {
-                          final payments = await _paymentService
-                              .getPaymentsByClassAndMonth(
-                                cls.id,
-                                _selectedMonth,
-                                _selectedYear,
-                              );
+                          final payments =
+                              await _paymentService.getPaymentsByClassAndMonth(
+                            cls.id,
+                            _selectedMonth,
+                            _selectedYear,
+                          );
                           final classSales = payments.fold(
                             0.0,
                             (total, p) => total + p.amount,
@@ -114,8 +115,8 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                         setDialogState(() {
                           salesAmount = totalSales;
                           commissionAmount = totalCommission;
-                          amountController.text = commissionAmount
-                              .toStringAsFixed(2);
+                          amountController.text =
+                              commissionAmount.toStringAsFixed(2);
                         });
                       }
                     },
@@ -148,7 +149,11 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: amountController,
-                    keyboardType: TextInputType.number,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'Payment Amount',
                       prefixIcon: Icon(Icons.payments_outlined),
@@ -301,155 +306,166 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline_rounded,
-                          size: 48,
-                          color: colorScheme.error,
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline_rounded,
+                              size: 48,
+                              color: colorScheme.error,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Something went wrong',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _error!,
+                              style: TextStyle(color: colorScheme.error),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _loadPayments,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Something went wrong',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          style: TextStyle(color: colorScheme.error),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton.icon(
-                          onPressed: _loadPayments,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _teacherPayments.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.account_balance_wallet_rounded,
-                          size: 64,
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No teacher payments for this month',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  )
-                : Consumer<TeacherProvider>(
-                    builder: (context, teacherProv, _) {
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: _teacherPayments.length,
-                        itemBuilder: (context, index) {
-                          final payment = _teacherPayments[index];
-                          final teacher = teacherProv.getTeacherById(
-                            payment.teacherId,
-                          );
+                      )
+                    : _teacherPayments.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  size: 64,
+                                  color:
+                                      colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No teacher payments for this month',
+                                  style: TextStyle(
+                                      color: colorScheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Consumer<TeacherProvider>(
+                            builder: (context, teacherProv, _) {
+                              return ListView.builder(
+                                padding: const EdgeInsets.all(20),
+                                itemCount: _teacherPayments.length,
+                                itemBuilder: (context, index) {
+                                  final payment = _teacherPayments[index];
+                                  final teacher = teacherProv.getTeacherById(
+                                    payment.teacherId,
+                                  );
 
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundColor:
-                                            colorScheme.secondaryContainer,
-                                        child: Text(
-                                          teacher?.name.isNotEmpty == true
-                                              ? teacher!.name[0].toUpperCase()
-                                              : '?',
-                                          style: TextStyle(
-                                            color: colorScheme
-                                                .onSecondaryContainer,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              teacher?.name ?? 'Unknown',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
+                                  return Card(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              CircleAvatar(
+                                                backgroundColor: colorScheme
+                                                    .secondaryContainer,
+                                                child: Text(
+                                                  teacher?.name.isNotEmpty ==
+                                                          true
+                                                      ? teacher!.name[0]
+                                                          .toUpperCase()
+                                                      : '?',
+                                                  style: TextStyle(
+                                                    color: colorScheme
+                                                        .onSecondaryContainer,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      teacher?.name ??
+                                                          'Unknown',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      DateFormat(
+                                                        'dd MMM yyyy',
+                                                      ).format(payment.date),
+                                                      style: TextStyle(
+                                                        color: colorScheme
+                                                            .onSurfaceVariant,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Text(
+                                                payment.amount
+                                                    .toStringAsFixed(2),
+                                                style: theme
+                                                    .textTheme.titleMedium
+                                                    ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.green,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (payment.notes.isNotEmpty) ...[
+                                            const SizedBox(height: 8),
                                             Text(
-                                              DateFormat(
-                                                'dd MMM yyyy',
-                                              ).format(payment.date),
+                                              payment.notes,
                                               style: TextStyle(
                                                 color: colorScheme
                                                     .onSurfaceVariant,
-                                                fontSize: 12,
+                                                fontSize: 13,
                                               ),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      Text(
-                                        payment.amount.toStringAsFixed(2),
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.green,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (payment.notes.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      payment.notes,
-                                      style: TextStyle(
-                                        color: colorScheme.onSurfaceVariant,
-                                        fontSize: 13,
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              _miniLabel(
+                                                'Sales',
+                                                payment.salesAmount
+                                                    .toStringAsFixed(2),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              _miniLabel(
+                                                'Commission',
+                                                payment.commissionAmount
+                                                    .toStringAsFixed(2),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      _miniLabel(
-                                        'Sales',
-                                        payment.salesAmount.toStringAsFixed(2),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _miniLabel(
-                                        'Commission',
-                                        payment.commissionAmount
-                                            .toStringAsFixed(2),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
           ),
         ],
       ),
@@ -468,8 +484,8 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
       child: Text(
         '$label: $value',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
       ),
     );
   }

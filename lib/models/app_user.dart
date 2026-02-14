@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum UserRole {
   admin,
   teacher,
-  marker;
+  marker,
+  pending;
 
   String get displayName {
     switch (this) {
@@ -13,6 +14,8 @@ enum UserRole {
         return 'Teacher';
       case UserRole.marker:
         return 'Attendance Marker';
+      case UserRole.pending:
+        return 'Pending';
     }
   }
 
@@ -40,6 +43,7 @@ class AppUser {
   bool get isAdmin => role == UserRole.admin;
   bool get isTeacher => role == UserRole.teacher;
   bool get isMarker => role == UserRole.marker;
+  bool get isPending => role == UserRole.pending;
 
   Map<String, dynamic> toMap() {
     return {

@@ -36,6 +36,9 @@ class AppRouter {
       initialLocation: '/dashboard',
       refreshListenable: authProvider,
       redirect: (context, state) {
+        // While auth is still initializing, don't redirect
+        if (!authProvider.isInitialized) return null;
+
         final isAuthenticated = authProvider.isAuthenticated;
         final isUnauthorized = authProvider.isUnauthorized;
         final isLoginRoute = state.matchedLocation == '/login';

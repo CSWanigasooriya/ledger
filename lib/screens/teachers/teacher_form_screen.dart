@@ -38,9 +38,8 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
 
   void _loadTeacher() {
     final provider = context.read<TeacherProvider>();
-    final teacher = provider.teachers
-        .where((t) => t.id == widget.teacherId)
-        .firstOrNull;
+    final teacher =
+        provider.teachers.where((t) => t.id == widget.teacherId).firstOrNull;
     if (teacher != null) {
       _existingTeacher = teacher;
       _nameController.text = teacher.name;
@@ -159,7 +158,7 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
                           controller: _contactController,
                           keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
-                            labelText: 'Contact No',
+                            labelText: 'Contact Number',
                             prefixIcon: Icon(Icons.phone_outlined),
                           ),
                         ),
@@ -181,9 +180,7 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
                             prefixIcon: Icon(Icons.badge_outlined),
                           ),
                         ),
-
                         const SizedBox(height: 32),
-
                         Text(
                           'Bank Details',
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -214,9 +211,7 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
                             prefixIcon: Icon(Icons.location_city_outlined),
                           ),
                         ),
-
                         const SizedBox(height: 32),
-
                         FilledButton(
                           onPressed: _handleSubmit,
                           child: Text(

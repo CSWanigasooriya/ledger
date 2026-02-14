@@ -15,9 +15,8 @@ class TeacherDetailScreen extends StatelessWidget {
 
     return Consumer2<TeacherProvider, ClassProvider>(
       builder: (context, teacherProv, classProv, _) {
-        final teacher = teacherProv.teachers
-            .where((t) => t.id == teacherId)
-            .firstOrNull;
+        final teacher =
+            teacherProv.teachers.where((t) => t.id == teacherId).firstOrNull;
 
         if (teacher == null) {
           return Scaffold(
@@ -99,7 +98,6 @@ class TeacherDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     _buildInfoCard(theme, 'Contact Information', [
                       _InfoItem(
                         Icons.email_outlined,
@@ -118,7 +116,6 @@ class TeacherDetailScreen extends StatelessWidget {
                       ),
                     ]),
                     const SizedBox(height: 16),
-
                     _buildInfoCard(theme, 'Bank Details', [
                       _InfoItem(
                         Icons.account_balance_outlined,
@@ -129,7 +126,7 @@ class TeacherDetailScreen extends StatelessWidget {
                       ),
                       _InfoItem(
                         Icons.numbers_outlined,
-                        'Account No',
+                        'Account Number',
                         teacher.bankDetails.accountNo.isNotEmpty
                             ? teacher.bankDetails.accountNo
                             : '—',
@@ -143,7 +140,6 @@ class TeacherDetailScreen extends StatelessWidget {
                       ),
                     ]),
                     const SizedBox(height: 20),
-
                     Text(
                       'Assigned Classes (${assignedClasses.length})',
                       style: theme.textTheme.titleMedium?.copyWith(

@@ -58,8 +58,8 @@ class DashboardScreen extends StatelessWidget {
                 final crossAxisCount = constraints.maxWidth > 900
                     ? 4
                     : constraints.maxWidth > 600
-                    ? 2
-                    : 2;
+                        ? 2
+                        : 2;
                 return _buildStatsGrid(context, crossAxisCount);
               },
             ),
@@ -135,7 +135,7 @@ class DashboardScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.6,
+          childAspectRatio: crossAxisCount >= 4 ? 2.6 : 1.4,
           children: stats,
         );
       },
