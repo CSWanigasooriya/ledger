@@ -160,6 +160,7 @@ class _UserCard extends StatelessWidget {
             const SizedBox(width: 16),
             // Info
             Expanded(
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -168,6 +169,8 @@ class _UserCard extends StatelessWidget {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -175,14 +178,18 @@ class _UserCard extends StatelessWidget {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             // Role dropdown — only show assignable roles (not pending)
-            SizedBox(
-              width: 180,
+            Expanded(
+              flex: 2,
               child: DropdownButtonFormField<UserRole>(
+                isExpanded: true,
                 initialValue: user.isPending ? null : user.role,
                 hint: Text(
                   'Assign Role',
