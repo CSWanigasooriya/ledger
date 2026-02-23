@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/student.dart';
 import '../../providers/student_provider.dart';
+import '../../providers/class_provider.dart';
 import '../../core/widgets/loading_overlay.dart';
 
 class StudentFormScreen extends StatefulWidget {
@@ -25,10 +26,17 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
 
   bool _isEditing = false;
   Student? _existingStudent;
+  final Set<String> _selectedClassIds = {};
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
+    // Ensure classes are loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ClassProvider>().init();
+    });
+
     if (widget.studentId != null) {
       _isEditing = true;
       _loadStudent();
@@ -48,6 +56,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       _emailController.text = student.email;
       _guardianNameController.text = student.guardianName;
       _guardianMobileController.text = student.guardianMobileNo;
+      _selectedClassIds.addAll(student.classIds);
     }
   }
 
@@ -66,40 +75,71 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final provider = context.read<StudentProvider>();
+    setState(() => _isSubmitting = true);
 
-    final student = Student(
-      id: _existingStudent?.id ?? '',
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      mobileNo: _mobileController.text.trim(),
-      address: _addressController.text.trim(),
-      email: _emailController.text.trim(),
-      guardianName: _guardianNameController.text.trim(),
-      guardianMobileNo: _guardianMobileController.text.trim(),
-      qrCode: _existingStudent?.qrCode ?? '',
-      classIds: _existingStudent?.classIds ?? [],
-      createdAt: _existingStudent?.createdAt,
-    );
+    try {
+      final studentProvider = context.read<StudentProvider>();
+      final classProvider = context.read<ClassProvider>();
 
-    bool success;
-    if (_isEditing) {
-      success = await provider.updateStudent(student);
-    } else {
-      final created = await provider.createStudent(student);
-      success = created != null;
-    }
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Student ${_isEditing ? 'updated' : 'created'} successfully',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      final student = Student(
+        id: _existingStudent?.id ?? '',
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        mobileNo: _mobileController.text.trim(),
+        address: _addressController.text.trim(),
+        email: _emailController.text.trim(),
+        guardianName: _guardianNameController.text.trim(),
+        guardianMobileNo: _guardianMobileController.text.trim(),
+        qrCode: _existingStudent?.qrCode ?? '',
+        classIds: _selectedClassIds.toList(),
+        createdAt: _existingStudent?.createdAt,
       );
-      context.pop();
+
+      bool success;
+      Student? createdStudent;
+      if (_isEditing) {
+        success = await studentProvider.updateStudent(student);
+      } else {
+        createdStudent = await studentProvider.createStudent(student);
+        success = createdStudent != null;
+      }
+
+      if (success) {
+        final studentIdToUse = _isEditing ? student.id : createdStudent!.id;
+
+        // Calculate differences for class enrollments
+        final previousClassIds = _existingStudent?.classIds ?? [];
+        final addedClasses = _selectedClassIds
+            .where((id) => !previousClassIds.contains(id))
+            .toList();
+        final removedClasses = previousClassIds
+            .where((id) => !_selectedClassIds.contains(id))
+            .toList();
+
+        // Enroll and remove from classes
+        for (final classId in addedClasses) {
+          await classProvider.enrollStudent(classId, studentIdToUse);
+        }
+        for (final classId in removedClasses) {
+          await classProvider.removeStudent(classId, studentIdToUse);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Student ${_isEditing ? 'updated' : 'created'} successfully',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          context.pop();
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -107,10 +147,14 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Consumer<StudentProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<StudentProvider, ClassProvider>(
+      builder: (context, studentProvider, classProvider, _) {
+        final isLoading = studentProvider.isLoading ||
+            _isSubmitting ||
+            classProvider.isLoading;
+
         return LoadingOverlay(
-          isLoading: provider.isLoading,
+          isLoading: isLoading,
           child: Scaffold(
             appBar: AppBar(
               title: Text(_isEditing ? 'Edit Student' : 'New Student'),
@@ -189,6 +233,41 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                             alignLabelWithHint: true,
                           ),
                         ),
+
+                        const SizedBox(height: 32),
+
+                        // Class Assignation
+                        Text(
+                          'Class Assignment',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (classProvider.classes.isEmpty)
+                          const Text('No classes available.')
+                        else
+                          Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: classProvider.classes.map((classModel) {
+                              final isSelected =
+                                  _selectedClassIds.contains(classModel.id);
+                              return FilterChip(
+                                label: Text(classModel.className),
+                                selected: isSelected,
+                                onSelected: (bool selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedClassIds.add(classModel.id);
+                                    } else {
+                                      _selectedClassIds.remove(classModel.id);
+                                    }
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
 
                         const SizedBox(height: 32),
 
