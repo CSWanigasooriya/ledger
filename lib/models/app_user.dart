@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum UserRole {
+  superAdmin,
   admin,
   teacher,
   marker,
@@ -8,6 +9,8 @@ enum UserRole {
 
   String get displayName {
     switch (this) {
+      case UserRole.superAdmin:
+        return 'Super Admin';
       case UserRole.admin:
         return 'Admin';
       case UserRole.teacher:
@@ -40,10 +43,16 @@ class AppUser {
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
-  bool get isAdmin => role == UserRole.admin;
+  bool get isSuperAdmin => role == UserRole.superAdmin;
+  bool get isAdmin => role == UserRole.admin || role == UserRole.superAdmin;
   bool get isTeacher => role == UserRole.teacher;
   bool get isMarker => role == UserRole.marker;
   bool get isPending => role == UserRole.pending;
+
+  /// Super admin has all access; normal admin has restricted access (no payments management, no commission updates)
+  bool get canManagePayments => role == UserRole.superAdmin;
+  bool get canUpdateCommissions => role == UserRole.superAdmin;
+  bool get canManageUsers => role == UserRole.superAdmin || role == UserRole.admin;
 
   Map<String, dynamic> toMap() {
     return {

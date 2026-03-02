@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/class_model.dart';
 import '../../providers/class_provider.dart';
 import '../../providers/teacher_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/widgets/loading_overlay.dart';
 
 class ClassFormScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
   String? _selectedTeacherId;
   bool _isEditing = false;
   ClassModel? _existingClass;
+  int _numberOfWeeks = 4;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
       _feesController.text = cls.classFees.toString();
       _commissionController.text = cls.teacherCommissionRate.toString();
       _selectedTeacherId = cls.teacherId.isNotEmpty ? cls.teacherId : null;
+      _numberOfWeeks = cls.numberOfWeeks;
     }
   }
 
@@ -58,6 +61,23 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final provider = context.read<ClassProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    // Check commission rate edit permission
+    if (_isEditing && !authProvider.canUpdateCommissions) {
+      final oldRate = _existingClass?.teacherCommissionRate ?? 0.0;
+      final newRate = double.tryParse(_commissionController.text) ?? 0.0;
+      if (oldRate != newRate) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Only super admins can change commission rates',
+            ),
+          ),
+        );
+        return;
+      }
+    }
 
     final classModel = ClassModel(
       id: _existingClass?.id ?? '',
@@ -66,12 +86,16 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
       teacherCommissionRate: double.tryParse(_commissionController.text) ?? 0.0,
       classFees: double.tryParse(_feesController.text) ?? 0.0,
       studentIds: _existingClass?.studentIds ?? [],
+      numberOfWeeks: _numberOfWeeks,
       createdAt: _existingClass?.createdAt,
     );
 
     bool success;
     if (_isEditing) {
-      success = await provider.updateClass(classModel);
+      success = await provider.updateClass(
+        classModel,
+        changedBy: authProvider.appUser?.email ?? '',
+      );
     } else {
       final created = await provider.createClass(classModel);
       success = created != null;
@@ -92,6 +116,7 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = context.watch<AuthProvider>();
 
     return Consumer2<ClassProvider, TeacherProvider>(
       builder: (context, classProv, teacherProv, _) {
@@ -172,12 +197,39 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
                             FilteringTextInputFormatter.allow(
                                 RegExp(r'[0-9.]')),
                           ],
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Teacher Commission Rate (%)',
-                            prefixIcon: Icon(Icons.percent_rounded),
+                            prefixIcon: const Icon(Icons.percent_rounded),
                             suffixText: '%',
+                            enabled: authProvider.canUpdateCommissions || !_isEditing,
+                            helperText: _isEditing && !authProvider.canUpdateCommissions
+                                ? 'Only super admins can change commission rates'
+                                : null,
                           ),
                         ),
+                        const SizedBox(height: 16),
+
+                        // Number of weeks per month
+                        DropdownButtonFormField<int>(
+                          initialValue: _numberOfWeeks,
+                          decoration: const InputDecoration(
+                            labelText: 'Weeks per Month',
+                            prefixIcon: Icon(Icons.calendar_view_week),
+                          ),
+                          items: List.generate(
+                            5,
+                            (i) => DropdownMenuItem(
+                              value: i + 1,
+                              child: Text('${i + 1} week${i > 0 ? 's' : ''}'),
+                            ),
+                          ),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => _numberOfWeeks = v);
+                            }
+                          },
+                        ),
+
                         const SizedBox(height: 32),
                         FilledButton(
                           onPressed: _handleSubmit,

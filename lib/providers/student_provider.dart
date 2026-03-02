@@ -9,10 +9,12 @@ class StudentProvider extends ChangeNotifier {
   List<Student> _students = [];
   bool _isLoading = false;
   String? _error;
+  bool _showDeleted = false;
 
   List<Student> get students => _students;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get showDeleted => _showDeleted;
 
   StreamSubscription? _subscription;
 
@@ -22,6 +24,23 @@ class StudentProvider extends ChangeNotifier {
       _students = students;
       notifyListeners();
     });
+  }
+
+  /// Toggle to show/hide soft-deleted students.
+  void toggleShowDeleted() {
+    _showDeleted = !_showDeleted;
+    _subscription?.cancel();
+    if (_showDeleted) {
+      _subscription = _service.getAllStudentsStream().listen((students) {
+        _students = students;
+        notifyListeners();
+      });
+    } else {
+      _subscription = _service.getStudentsStream().listen((students) {
+        _students = students;
+        notifyListeners();
+      });
+    }
   }
 
   @override
@@ -77,6 +96,36 @@ class StudentProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> restoreStudent(String id) async {
+    try {
+      await _service.restoreStudent(id);
+      return true;
+    } catch (e) {
+      _error = 'Failed to restore student: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> setFreeCard(String id, bool isFreeCard) async {
+    try {
+      await _service.setFreeCard(id, isFreeCard);
+      return true;
+    } catch (e) {
+      _error = 'Failed to update free card: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<Student?> findByStudentId(String studentId) async {
+    try {
+      return await _service.getStudentByStudentId(studentId);
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<List<Student>> getStudentsByIds(List<String> ids) async {
     return await _service.getStudentsByIds(ids);
   }
@@ -90,7 +139,8 @@ class StudentProvider extends ChangeNotifier {
               s.firstName.toLowerCase().contains(lowerQuery) ||
               s.lastName.toLowerCase().contains(lowerQuery) ||
               s.email.toLowerCase().contains(lowerQuery) ||
-              s.mobileNo.contains(lowerQuery),
+              s.mobileNo.contains(lowerQuery) ||
+              s.studentId.toLowerCase().contains(lowerQuery),
         )
         .toList();
   }

@@ -54,4 +54,19 @@ class ExpenseService {
     final expenses = await getExpensesByMonth(month, year);
     return expenses.fold<double>(0.0, (total, e) => total + e.amount);
   }
+
+  Future<List<Expense>> getExpensesByDateRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final snapshot = await _collection
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('date', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Expense.fromMap(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
 }

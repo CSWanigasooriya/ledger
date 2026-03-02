@@ -28,6 +28,11 @@ class QrPrintScreen extends StatelessWidget {
           );
         }
 
+        // QR data is the student ID (e.g., B1001)
+        final qrData = student.studentId.isNotEmpty
+            ? student.studentId
+            : student.qrCode;
+
         return Scaffold(
           appBar: AppBar(
             title: const Text('Student QR Card'),
@@ -36,8 +41,7 @@ class QrPrintScreen extends StatelessWidget {
                 onPressed: () => _printQrCard(
                   context,
                   student.fullName,
-                  student.qrCode,
-                  student.id,
+                  qrData,
                 ),
                 icon: const Icon(Icons.print_rounded, size: 18),
                 label: const Text('Print'),
@@ -93,7 +97,7 @@ class QrPrintScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                         QrImageView(
-                          data: student.qrCode,
+                          data: qrData,
                           version: QrVersions.auto,
                           size: 180,
                           eyeStyle: QrEyeStyle(
@@ -124,12 +128,19 @@ class QrPrintScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            student.qrCode,
+                            qrData,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.5,
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Grade ${student.grade}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -154,13 +165,12 @@ class QrPrintScreen extends StatelessWidget {
   Future<void> _printQrCard(
     BuildContext context,
     String name,
-    String qrCode,
-    String studentId,
+    String qrData,
   ) async {
     final pdf = pw.Document();
 
     final qrImage = await QrPainter(
-      data: qrCode,
+      data: qrData,
       version: QrVersions.auto,
       gapless: true,
     ).toImageData(300);
@@ -205,10 +215,11 @@ class QrPrintScreen extends StatelessWidget {
                       ),
                       pw.SizedBox(height: 4),
                       pw.Text(
-                        qrCode,
-                        style: const pw.TextStyle(
-                          fontSize: 8,
-                          color: PdfColors.grey700,
+                        qrData,
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.indigo,
                         ),
                       ),
                     ],

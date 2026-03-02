@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../models/class_model.dart';
 import '../services/class_service.dart';
 import '../services/student_service.dart';
+import '../services/class_schedule_service.dart';
 
 class ClassProvider extends ChangeNotifier {
   final ClassService _classService = ClassService();
   final StudentService _studentService = StudentService();
+  final ClassScheduleService _scheduleService = ClassScheduleService();
 
   List<ClassModel> _classes = [];
   bool _isLoading = false;
@@ -50,13 +52,14 @@ class ClassProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateClass(ClassModel classModel) async {
+  Future<bool> updateClass(ClassModel classModel,
+      {String changedBy = ''}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _classService.updateClass(classModel);
+      await _classService.updateClass(classModel, changedBy: changedBy);
       _isLoading = false;
       notifyListeners();
       return true;
@@ -113,5 +116,37 @@ class ClassProvider extends ChangeNotifier {
 
   List<ClassModel> getClassesByTeacher(String teacherId) {
     return _classes.where((c) => c.teacherId == teacherId).toList();
+  }
+
+  /// Save monthly schedule for a class.
+  Future<bool> saveSchedule(
+    String classId,
+    int year,
+    int month,
+    List<ClassSchedule> weeks,
+  ) async {
+    try {
+      await _scheduleService.saveSchedule(classId, year, month, weeks);
+      return true;
+    } catch (e) {
+      _error = 'Failed to save schedule: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Get monthly schedule for a class.
+  Future<MonthlySchedule?> getSchedule(
+    String classId,
+    int year,
+    int month,
+  ) async {
+    return await _scheduleService.getSchedule(classId, year, month);
+  }
+
+  /// Get classes that have a session on a specific date.
+  Future<List<ClassModel>> getClassesForDate(DateTime date) async {
+    final classIds = await _scheduleService.getClassesForDate(date);
+    return _classes.where((c) => classIds.contains(c.id)).toList();
   }
 }

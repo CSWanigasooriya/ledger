@@ -18,9 +18,22 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   String? _selectedClassId;
   DateTime _selectedDate = DateTime.now();
+  int _selectedWeek = 1;
   List<Student> _classStudents = [];
   Map<String, bool> _attendanceMap = {};
   bool _loading = false;
+  final _manualSearchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _manualSearchController.dispose();
+    super.dispose();
+  }
+
+  int _calculateWeekNumber(DateTime date) {
+    // Week number within the month (1-4+)
+    return ((date.day - 1) ~/ 7) + 1;
+  }
 
   Future<void> _loadData() async {
     if (_selectedClassId == null) return;
@@ -50,6 +63,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _classStudents = students;
         _attendanceMap = map;
         _loading = false;
+        _selectedWeek = _calculateWeekNumber(_selectedDate);
       });
     }
   }
@@ -59,13 +73,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     final attendanceProv = context.read<AttendanceProvider>();
     final records = _attendanceMap.entries.map((e) {
+      final student = _classStudents.where((s) => s.id == e.key).firstOrNull;
       return Attendance(
         id: '',
         classId: _selectedClassId!,
         studentId: e.key,
         date: _selectedDate,
+        weekNumber: _selectedWeek,
         isPresent: e.value,
         markedBy: 'admin',
+        studentDisplayId: student?.studentId,
       );
     }).toList();
 
@@ -80,6 +97,124 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         const SnackBar(content: Text('Attendance saved successfully')),
       );
     }
+  }
+
+  /// Manual attendance mark: search by student ID or name
+  void _showManualMarkDialog() {
+    if (_selectedClassId == null) return;
+
+    final studentProv = context.read<StudentProvider>();
+    final allStudents = studentProv.students;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final filtered = query.isEmpty
+                ? <Student>[]
+                : allStudents.where((s) {
+                    final lq = query.toLowerCase();
+                    return s.fullName.toLowerCase().contains(lq) ||
+                        s.studentId.toLowerCase().contains(lq);
+                  }).toList();
+
+            return AlertDialog(
+              title: const Text('Manual Attendance'),
+              content: SizedBox(
+                width: 400,
+                height: 400,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        hintText: 'Search by name or student ID...',
+                        prefixIcon: Icon(Icons.search),
+                        isDense: true,
+                      ),
+                      onChanged: (v) => setDialogState(() => query = v),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                query.isEmpty
+                                    ? 'Type to search'
+                                    : 'No students found',
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (_, i) {
+                                final student = filtered[i];
+                                final alreadyMarked =
+                                    _attendanceMap.containsKey(student.id) &&
+                                        _attendanceMap[student.id] == true;
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: alreadyMarked
+                                        ? Colors.green
+                                            .withValues(alpha: 0.15)
+                                        : null,
+                                    child: Text(
+                                      student.studentId.isNotEmpty
+                                          ? student.studentId[0]
+                                          : '?',
+                                    ),
+                                  ),
+                                  title: Text(student.fullName),
+                                  subtitle: Text(student.studentId),
+                                  trailing: alreadyMarked
+                                      ? const Icon(Icons.check_circle,
+                                          color: Colors.green)
+                                      : null,
+                                  onTap: () {
+                                    if (_attendanceMap
+                                        .containsKey(student.id)) {
+                                      setState(() {
+                                        _attendanceMap[student.id] = true;
+                                      });
+                                      setDialogState(() {});
+                                    } else {
+                                      // Student not enrolled - add as present
+                                      setState(() {
+                                        _classStudents.add(student);
+                                        _attendanceMap[student.id] = true;
+                                      });
+                                      setDialogState(() {});
+                                    }
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${student.fullName} marked present',
+                                        ),
+                                        duration:
+                                            const Duration(seconds: 1),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -149,7 +284,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         lastDate: DateTime.now(),
                       );
                       if (date != null) {
-                        setState(() => _selectedDate = date);
+                        setState(() {
+                          _selectedDate = date;
+                          _selectedWeek = _calculateWeekNumber(date);
+                        });
                         _loadData();
                       }
                     },
@@ -165,6 +303,29 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                   ),
                 ),
+                // Week selector
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField<int>(
+                    isExpanded: true,
+                    initialValue: _selectedWeek,
+                    decoration: const InputDecoration(
+                      labelText: 'Week',
+                      isDense: true,
+                      prefixIcon: Icon(Icons.calendar_view_week, size: 18),
+                    ),
+                    items: List.generate(
+                      5,
+                      (i) => DropdownMenuItem(
+                        value: i + 1,
+                        child: Text('Week ${i + 1}'),
+                      ),
+                    ),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedWeek = v);
+                    },
+                  ),
+                ),
                 // Save Button
                 FilledButton.icon(
                   onPressed: _classStudents.isNotEmpty ? _saveAttendance : null,
@@ -178,6 +339,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       : null,
                   icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
                   label: const Text('Scan QR'),
+                ),
+                // Manual Mark Button
+                OutlinedButton.icon(
+                  onPressed:
+                      _selectedClassId != null ? _showManualMarkDialog : null,
+                  icon: const Icon(Icons.person_search_rounded, size: 18),
+                  label: const Text('Manual'),
                 ),
               ],
             ),
@@ -227,7 +395,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                 child: Row(
                                   children: [
                                     Text(
-                                      '${_classStudents.length} students',
+                                      '${_classStudents.length} students • Week $_selectedWeek',
                                       style:
                                           theme.textTheme.bodyMedium?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -315,11 +483,52 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                                 : Colors.red,
                                           ),
                                         ),
-                                        title: Text(
-                                          student.fullName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                        title: Row(
+                                          children: [
+                                            if (student.studentId
+                                                .isNotEmpty) ...[
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 1,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primaryContainer,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  student.studentId,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onPrimaryContainer,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            Expanded(
+                                              child: Text(
+                                                student.fullName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                            if (student.isFreeCard)
+                                              Icon(
+                                                Icons.card_giftcard,
+                                                size: 16,
+                                                color:
+                                                    Colors.orange.shade700,
+                                              ),
+                                          ],
                                         ),
                                         subtitle: Text(
                                           isPresent ? 'Present' : 'Absent',

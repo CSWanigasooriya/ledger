@@ -13,6 +13,12 @@ class AppConstants {
   static const String expensesCollection = 'expenses';
   static const String teacherPaymentsCollection = 'teacher_payments';
   static const String usersCollection = 'users';
+  static const String countersCollection = 'counters';
+  static const String classSchedulesCollection = 'class_schedules';
+  static const String auditLogsCollection = 'audit_logs';
+
+  // Counter document IDs
+  static const String studentCounterDoc = 'student_id_counter';
 
   // Expense Types
   static const List<String> expenseTypes = [
@@ -24,4 +30,7 @@ class AppConstants {
     'Maintenance',
     'Other',
   ];
+
+  // Student ID starts at 1001
+  static const int studentIdStart = 1001;
 }

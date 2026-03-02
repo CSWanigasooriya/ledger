@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/teacher_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/widgets/search_field.dart';
 import '../../core/widgets/empty_state.dart';
 
@@ -19,11 +20,21 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final authProv = context.watch<AuthProvider>();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Teachers'),
         actions: [
+          if (authProv.isSuperAdmin)
+            Consumer<TeacherProvider>(
+              builder: (context, prov, _) => FilterChip(
+                label: Text(prov.showDeleted ? 'Hide Deleted' : 'Show Deleted'),
+                selected: prov.showDeleted,
+                onSelected: (_) => prov.toggleShowDeleted(),
+              ),
+            ),
+          const SizedBox(width: 8),
           FilledButton.icon(
             onPressed: () => context.go('/teachers/new'),
             icon: const Icon(Icons.add, size: 18),
@@ -72,39 +83,92 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 4),
                   itemBuilder: (context, index) {
                     final teacher = teachers[index];
-                    return Card(
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        leading: CircleAvatar(
-                          backgroundColor: colorScheme.secondaryContainer,
-                          child: Text(
-                            teacher.name.isNotEmpty
-                                ? teacher.name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    final isDeleted = teacher.isDeleted;
+                    return Opacity(
+                      opacity: isDeleted ? 0.5 : 1.0,
+                      child: Card(
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
                           ),
+                          leading: CircleAvatar(
+                            backgroundColor: isDeleted
+                                ? colorScheme.errorContainer
+                                : colorScheme.secondaryContainer,
+                            child: isDeleted
+                                ? Icon(Icons.delete_rounded,
+                                    color: colorScheme.error, size: 20)
+                                : Text(
+                                    teacher.name.isNotEmpty
+                                        ? teacher.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: colorScheme.onSecondaryContainer,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  teacher.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              if (isDeleted)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.errorContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Deleted',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: colorScheme.error,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              if (teacher.status.name == 'inactive')
+                                Container(
+                                  margin: const EdgeInsets.only(left: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Inactive',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: Text(
+                            teacher.email.isNotEmpty
+                                ? teacher.email
+                                : teacher.contactNo,
+                            style: TextStyle(
+                                color: colorScheme.onSurfaceVariant),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          onTap: () =>
+                              context.go('/teachers/${teacher.id}'),
                         ),
-                        title: Text(
-                          teacher.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          teacher.email.isNotEmpty
-                              ? teacher.email
-                              : teacher.contactNo,
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        onTap: () => context.go('/teachers/${teacher.id}'),
                       ),
                     );
                   },

@@ -26,8 +26,12 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   UserRole? get role => _appUser?.role;
   bool get isAdmin => _appUser?.isAdmin ?? false;
+  bool get isSuperAdmin => _appUser?.role == UserRole.superAdmin;
   bool get isTeacher => _appUser?.isTeacher ?? false;
   bool get isMarker => _appUser?.isMarker ?? false;
+  bool get canManagePayments => _appUser?.canManagePayments ?? false;
+  bool get canUpdateCommissions => _appUser?.canUpdateCommissions ?? false;
+  bool get canManageUsers => _appUser?.canManageUsers ?? false;
 
   AuthProvider() {
     _authService.authStateChanges.listen((user) {
@@ -68,12 +72,12 @@ class AuthProvider extends ChangeNotifier {
       final hasUsers = await _userService.hasAnyUsers();
 
       if (!hasUsers) {
-        // First user becomes admin automatically
+        // First user becomes super admin automatically
         final newUser = AppUser(
           uid: firebaseUser.uid,
           email: firebaseUser.email ?? '',
           displayName: firebaseUser.displayName ?? '',
-          role: UserRole.admin,
+          role: UserRole.superAdmin,
         );
         await _userService.createUser(newUser);
         _appUser = newUser;

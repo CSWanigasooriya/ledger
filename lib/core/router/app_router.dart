@@ -21,6 +21,7 @@ import '../../screens/expenses/expense_list_screen.dart';
 import '../../screens/expenses/expense_form_screen.dart';
 import '../../screens/reports/report_screen.dart';
 import '../../screens/settings/user_management_screen.dart';
+import '../../screens/settings/excel_import_screen.dart';
 
 class AppRouter {
   // Routes accessible by role
@@ -247,6 +248,10 @@ class AppRouter {
         GoRoute(
           path: '/settings/users',
           builder: (context, state) => const UserManagementScreen(),
+        ),
+        GoRoute(
+          path: '/settings/import',
+          builder: (context, state) => const ExcelImportScreen(),
         ),
       ],
     );

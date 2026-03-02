@@ -18,10 +18,22 @@ class TeacherService {
   }
 
   Future<void> updateTeacher(Teacher teacher) async {
-    await _collection.doc(teacher.id).update(teacher.toMap());
+    await _collection.doc(teacher.id).update(
+      teacher.copyWith(updatedAt: DateTime.now()).toMap(),
+    );
   }
 
+  /// Soft delete — marks teacher as deleted/inactive.
   Future<void> deleteTeacher(String id) async {
+    await _collection.doc(id).update({
+      'isDeleted': true,
+      'status': TeacherStatus.inactive.name,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  /// Hard delete for when truly needed.
+  Future<void> permanentDeleteTeacher(String id) async {
     await _collection.doc(id).delete();
   }
 
@@ -40,6 +52,19 @@ class TeacherService {
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => Teacher.fromMap(doc.data() as Map<String, dynamic>))
+              .where((t) => !t.isDeleted)
+              .toList(),
+        );
+  }
+
+  /// Stream including soft-deleted teachers (for admin views).
+  Stream<List<Teacher>> getAllTeachersStream() {
+    return _collection
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Teacher.fromMap(doc.data() as Map<String, dynamic>))
               .toList(),
         );
   }
@@ -48,6 +73,7 @@ class TeacherService {
     final snapshot = await _collection.get();
     final allTeachers = snapshot.docs
         .map((doc) => Teacher.fromMap(doc.data() as Map<String, dynamic>))
+        .where((t) => !t.isDeleted)
         .toList();
     final lowerQuery = query.toLowerCase();
     return allTeachers
@@ -58,5 +84,14 @@ class TeacherService {
               t.contactNo.contains(lowerQuery),
         )
         .toList();
+  }
+
+  /// Restore a soft-deleted teacher.
+  Future<void> restoreTeacher(String id) async {
+    await _collection.doc(id).update({
+      'isDeleted': false,
+      'status': TeacherStatus.active.name,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
   }
 }

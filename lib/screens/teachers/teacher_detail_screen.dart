@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/teacher_provider.dart';
 import '../../providers/class_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../models/teacher.dart';
 
 class TeacherDetailScreen extends StatelessWidget {
   final String teacherId;
@@ -12,6 +14,7 @@ class TeacherDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final authProv = context.watch<AuthProvider>();
 
     return Consumer2<TeacherProvider, ClassProvider>(
       builder: (context, teacherProv, classProv, _) {
@@ -31,17 +34,33 @@ class TeacherDetailScreen extends StatelessWidget {
           appBar: AppBar(
             title: Text(teacher.name),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_rounded),
-                onPressed: () => context.go('/teachers/${teacher.id}/edit'),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: colorScheme.error,
+              if (!teacher.isDeleted) ...[
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded),
+                  onPressed: () => context.go('/teachers/${teacher.id}/edit'),
                 ),
-                onPressed: () => _confirmDelete(context, teacherProv, teacher),
-              ),
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: colorScheme.error,
+                  ),
+                  onPressed: () =>
+                      _confirmSoftDelete(context, teacherProv, teacher),
+                ),
+              ] else if (authProv.isSuperAdmin) ...[
+                IconButton(
+                  icon: const Icon(Icons.restore_rounded, color: Colors.green),
+                  tooltip: 'Restore',
+                  onPressed: () async {
+                    await teacherProv.restoreTeacher(teacher.id);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Teacher restored')),
+                      );
+                    }
+                  },
+                ),
+              ],
               const SizedBox(width: 8),
             ],
           ),
@@ -53,6 +72,36 @@ class TeacherDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Deleted banner
+                    if (teacher.isDeleted)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_rounded,
+                                color: colorScheme.error),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'This teacher has been deleted',
+                                style: TextStyle(color: colorScheme.error),
+                              ),
+                            ),
+                            if (authProv.isSuperAdmin)
+                              TextButton(
+                                onPressed: () =>
+                                    teacherProv.restoreTeacher(teacher.id),
+                                child: const Text('Restore'),
+                              ),
+                          ],
+                        ),
+                      ),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -90,6 +139,36 @@ class TeacherDetailScreen extends StatelessWidget {
                                       ),
                                     ),
                                   ],
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: teacher.status ==
+                                                  TeacherStatus.active
+                                              ? Colors.green
+                                                  .withValues(alpha: 0.15)
+                                              : Colors.orange
+                                                  .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          teacher.status.displayName,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: teacher.status ==
+                                                    TeacherStatus.active
+                                                ? Colors.green
+                                                : Colors.orange,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -246,16 +325,17 @@ class TeacherDetailScreen extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(
+  void _confirmSoftDelete(
     BuildContext context,
     TeacherProvider provider,
-    dynamic teacher,
+    Teacher teacher,
   ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Teacher'),
-        content: Text('Are you sure you want to delete ${teacher.name}?'),
+        content: Text(
+            'Are you sure you want to delete ${teacher.name}? This can be restored by a super admin.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -265,7 +345,12 @@ class TeacherDetailScreen extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               await provider.deleteTeacher(teacher.id);
-              if (context.mounted) context.go('/teachers');
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${teacher.name} deleted')),
+                );
+                context.go('/teachers');
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,

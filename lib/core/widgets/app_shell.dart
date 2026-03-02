@@ -20,42 +20,42 @@ class AppShell extends StatefulWidget {
         icon: Icons.dashboard_rounded,
         label: 'Dashboard',
         branchIndex: 0,
-        roles: {UserRole.admin}),
+        roles: {UserRole.superAdmin, UserRole.admin}),
     _NavItem(
         icon: Icons.school_rounded,
         label: 'Students',
         branchIndex: 1,
-        roles: {UserRole.admin}),
+        roles: {UserRole.superAdmin, UserRole.admin}),
     _NavItem(
         icon: Icons.person_rounded,
         label: 'Teachers',
         branchIndex: 2,
-        roles: {UserRole.admin}),
+        roles: {UserRole.superAdmin, UserRole.admin}),
     _NavItem(
         icon: Icons.class_rounded,
         label: 'Classes',
         branchIndex: 3,
-        roles: {UserRole.admin, UserRole.teacher}),
+        roles: {UserRole.superAdmin, UserRole.admin, UserRole.teacher}),
     _NavItem(
         icon: Icons.fact_check_rounded,
         label: 'Attendance',
         branchIndex: 4,
-        roles: {UserRole.admin, UserRole.marker}),
+        roles: {UserRole.superAdmin, UserRole.admin, UserRole.marker}),
     _NavItem(
         icon: Icons.receipt_long_rounded,
         label: 'Payments',
         branchIndex: 5,
-        roles: {UserRole.admin, UserRole.teacher, UserRole.marker}),
+        roles: {UserRole.superAdmin, UserRole.admin, UserRole.teacher, UserRole.marker}),
     _NavItem(
         icon: Icons.money_off_rounded,
         label: 'Expenses',
         branchIndex: 6,
-        roles: {UserRole.admin}),
+        roles: {UserRole.superAdmin, UserRole.admin}),
     _NavItem(
         icon: Icons.bar_chart_rounded,
         label: 'Reports',
         branchIndex: 7,
-        roles: {UserRole.admin}),
+        roles: {UserRole.superAdmin, UserRole.admin}),
   ];
 
   @override
@@ -334,6 +334,40 @@ class _SidebarFooter extends StatelessWidget {
               ),
             ),
           ),
+        if (isAdmin)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => context.push('/settings/import'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.upload_file_rounded,
+                        size: 22,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Excel Import',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Material(
@@ -590,6 +624,14 @@ class _MobileLayout extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   context.push('/settings/users');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.upload_file_rounded),
+                title: const Text('Excel Import'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/settings/import');
                 },
               ),
             ],

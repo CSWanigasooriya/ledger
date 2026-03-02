@@ -56,6 +56,45 @@ class ReportService {
     );
   }
 
+  /// Generate report from a date range (for flexible reporting).
+  Future<ReportData> getReportByDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final payments = await _paymentService.getPaymentsByDateRange(
+      startDate,
+      endDate,
+    );
+    final expenses = await _expenseService.getExpensesByDateRange(
+      startDate,
+      endDate,
+    );
+    final teacherPayments = await _teacherPaymentService.getPaymentsByDateRange(
+      startDate,
+      endDate,
+    );
+
+    final totalRevenue = payments
+        .where((p) => !p.isFreeCard)
+        .fold(0.0, (sum, p) => sum + p.amount);
+    final totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final totalTeacherPay = teacherPayments.fold(
+      0.0,
+      (sum, tp) => sum + tp.amount,
+    );
+    final netIncome = totalRevenue - totalExpenses - totalTeacherPay;
+
+    return ReportData(
+      totalRevenue: totalRevenue,
+      totalExpenses: totalExpenses,
+      totalTeacherPayments: totalTeacherPay,
+      netIncome: netIncome,
+      totalAttendanceRecords: 0,
+      presentCount: 0,
+      attendanceRate: 0,
+    );
+  }
+
   Future<Map<String, double>> getRevenueByClass(int month, int year) async {
     final payments = await _paymentService.getPaymentsByMonth(month, year);
     final Map<String, double> revenueByClass = {};

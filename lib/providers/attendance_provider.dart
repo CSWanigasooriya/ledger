@@ -47,12 +47,51 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
+  /// Mark single student attendance (for manual mark by reg no / name).
+  Future<Attendance?> markSingleAttendance(Attendance attendance) async {
+    try {
+      // Check for duplicate
+      final exists = await _service.hasAttendance(
+        attendance.studentId,
+        attendance.classId,
+        attendance.date,
+      );
+      if (exists) {
+        _error = 'Attendance already marked for this student today';
+        notifyListeners();
+        return null;
+      }
+      final result = await _service.markAttendance(attendance);
+      _records.add(result);
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _error = 'Failed to mark attendance: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<List<Attendance>> getMonthlyAttendance(
     String classId,
     int month,
     int year,
   ) async {
     return await _service.getAttendanceByClassAndMonth(classId, month, year);
+  }
+
+  Future<List<Attendance>> getWeeklyAttendance(
+    String classId,
+    int month,
+    int year,
+    int weekNumber,
+  ) async {
+    return await _service.getAttendanceByClassMonthWeek(
+      classId,
+      month,
+      year,
+      weekNumber,
+    );
   }
 
   Future<void> deleteAndReplace(
@@ -74,5 +113,10 @@ class AttendanceProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }

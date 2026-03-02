@@ -60,4 +60,34 @@ class TeacherPaymentService {
               .toList(),
         );
   }
+
+  Future<List<TeacherPayment>> getPaymentsByDateRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final snapshot = await _collection
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('date', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map(
+          (doc) => TeacherPayment.fromMap(doc.data() as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// Get teacher payments grouped by teacher for a month.
+  Future<Map<String, List<TeacherPayment>>> getPaymentsByTeacherForMonth(
+    int month,
+    int year,
+  ) async {
+    final payments = await getPaymentsByMonth(month, year);
+    final grouped = <String, List<TeacherPayment>>{};
+    for (final p in payments) {
+      grouped.putIfAbsent(p.teacherId, () => []).add(p);
+    }
+    return grouped;
+  }
 }

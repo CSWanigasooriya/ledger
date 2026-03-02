@@ -80,66 +80,109 @@ class _ClassListScreenState extends State<ClassListScreen> {
                   itemBuilder: (context, index) {
                     final cls = classes[index];
                     final teacher = teacherProv.getTeacherById(cls.teacherId);
+                    final isDeleted = cls.isDeleted;
 
-                    return Card(
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        leading: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: colorScheme.tertiaryContainer,
-                            borderRadius: BorderRadius.circular(12),
+                    return Opacity(
+                      opacity: isDeleted ? 0.5 : 1.0,
+                      child: Card(
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                          child: Icon(
-                            Icons.class_rounded,
-                            color: colorScheme.onTertiaryContainer,
+                          leading: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: isDeleted
+                                  ? colorScheme.errorContainer
+                                  : colorScheme.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              isDeleted
+                                  ? Icons.delete_rounded
+                                  : Icons.class_rounded,
+                              color: isDeleted
+                                  ? colorScheme.onErrorContainer
+                                  : colorScheme.onTertiaryContainer,
+                            ),
                           ),
-                        ),
-                        title: Text(
-                          cls.className,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              teacher != null
-                                  ? 'Teacher: ${teacher.name}'
-                                  : 'No teacher assigned',
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  cls.className,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                _buildChip(
-                                  context,
-                                  '${cls.studentIds.length} students',
-                                  colorScheme.primaryContainer,
-                                  colorScheme.onPrimaryContainer,
+                              if (isDeleted)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.errorContainer,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Deleted',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: colorScheme.onErrorContainer,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(width: 8),
-                                _buildChip(
-                                  context,
-                                  'Fee: ${cls.classFees.toStringAsFixed(0)}',
-                                  colorScheme.secondaryContainer,
-                                  colorScheme.onSecondaryContainer,
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                teacher != null
+                                    ? 'Teacher: ${teacher.name}'
+                                    : 'No teacher assigned',
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  _buildChip(
+                                    context,
+                                    '${cls.studentIds.length} students',
+                                    colorScheme.primaryContainer,
+                                    colorScheme.onPrimaryContainer,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildChip(
+                                    context,
+                                    'Fee: ${cls.classFees.toStringAsFixed(0)}',
+                                    colorScheme.secondaryContainer,
+                                    colorScheme.onSecondaryContainer,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildChip(
+                                    context,
+                                    '${cls.numberOfWeeks} wks',
+                                    colorScheme.tertiaryContainer,
+                                    colorScheme.onTertiaryContainer,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          onTap: () => context.go('/classes/${cls.id}'),
                         ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        onTap: () => context.go('/classes/${cls.id}'),
                       ),
                     );
                   },

@@ -28,6 +28,28 @@ class BankDetails {
   }
 }
 
+enum TeacherStatus {
+  active,
+  inactive;
+
+  String get displayName {
+    switch (this) {
+      case TeacherStatus.active:
+        return 'Active';
+      case TeacherStatus.inactive:
+        return 'Inactive';
+    }
+  }
+
+  static TeacherStatus fromString(String? value) {
+    if (value == null) return TeacherStatus.active;
+    return TeacherStatus.values
+            .where((s) => s.name == value)
+            .firstOrNull ??
+        TeacherStatus.active;
+  }
+}
+
 class Teacher {
   final String id;
   final String name;
@@ -36,7 +58,10 @@ class Teacher {
   final String address;
   final BankDetails bankDetails;
   final String nic;
+  final TeacherStatus status;
+  final bool isDeleted;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   Teacher({
     required this.id,
@@ -46,7 +71,10 @@ class Teacher {
     this.address = '',
     BankDetails? bankDetails,
     this.nic = '',
+    this.status = TeacherStatus.active,
+    this.isDeleted = false,
     DateTime? createdAt,
+    this.updatedAt,
   }) : bankDetails = bankDetails ?? BankDetails(),
        createdAt = createdAt ?? DateTime.now();
 
@@ -59,7 +87,10 @@ class Teacher {
       'address': address,
       'bankDetails': bankDetails.toMap(),
       'nic': nic,
+      'status': status.name,
+      'isDeleted': isDeleted,
       'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
   }
 
@@ -74,7 +105,10 @@ class Teacher {
           ? BankDetails.fromMap(Map<String, dynamic>.from(map['bankDetails']))
           : BankDetails(),
       nic: map['nic'] ?? '',
+      status: TeacherStatus.fromString(map['status']),
+      isDeleted: map['isDeleted'] ?? false,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -86,7 +120,10 @@ class Teacher {
     String? address,
     BankDetails? bankDetails,
     String? nic,
+    TeacherStatus? status,
+    bool? isDeleted,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Teacher(
       id: id ?? this.id,
@@ -96,7 +133,10 @@ class Teacher {
       address: address ?? this.address,
       bankDetails: bankDetails ?? this.bankDetails,
       nic: nic ?? this.nic,
+      status: status ?? this.status,
+      isDeleted: isDeleted ?? this.isDeleted,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

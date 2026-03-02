@@ -64,6 +64,7 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
     final notesController = TextEditingController();
     double salesAmount = 0;
     double commissionAmount = 0;
+    List<_ClassBreakdown> classBreakdowns = [];
 
     final result = await showDialog<bool>(
       context: context,
@@ -83,6 +84,7 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     items: teacherProv.teachers
+                        .where((t) => !t.isDeleted)
                         .map(
                           (t) => DropdownMenuItem(
                             value: t.id,
@@ -93,10 +95,11 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                     onChanged: (v) async {
                       setDialogState(() => selectedTeacherId = v);
                       if (v != null) {
-                        // Calculate sales and commission
+                        // Calculate sales and commission per class
                         final classes = classProv.getClassesByTeacher(v);
                         double totalSales = 0;
                         double totalCommission = 0;
+                        List<_ClassBreakdown> breakdowns = [];
                         for (final cls in classes) {
                           final payments =
                               await _paymentService.getPaymentsByClassAndMonth(
@@ -104,17 +107,26 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                             _selectedMonth,
                             _selectedYear,
                           );
-                          final classSales = payments.fold(
-                            0.0,
-                            (total, p) => total + p.amount,
-                          );
-                          totalSales += classSales;
-                          totalCommission +=
+                          final classSales = payments
+                              .where((p) => !p.isFreeCard)
+                              .fold(0.0, (total, p) => total + p.amount);
+                          final classCommission =
                               classSales * cls.teacherCommissionRate / 100;
+                          totalSales += classSales;
+                          totalCommission += classCommission;
+                          breakdowns.add(_ClassBreakdown(
+                            className: cls.className,
+                            sales: classSales,
+                            commission: classCommission,
+                            commissionRate: cls.teacherCommissionRate,
+                            studentCount: cls.studentIds.length,
+                            paidCount: payments.where((p) => !p.isFreeCard).length,
+                          ));
                         }
                         setDialogState(() {
                           salesAmount = totalSales;
                           commissionAmount = totalCommission;
+                          classBreakdowns = breakdowns;
                           amountController.text =
                               commissionAmount.toStringAsFixed(2);
                         });
@@ -139,12 +151,89 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
                             salesAmount.toStringAsFixed(2),
                           ),
                           _infoRow(
-                            'Commission',
+                            'Total Commission',
                             commissionAmount.toStringAsFixed(2),
                           ),
                         ],
                       ),
                     ),
+                    // Class-wise breakdown
+                    if (classBreakdowns.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Class-wise Breakdown',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...classBreakdowns.map((b) => Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHigh
+                                  .withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  b.className,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Paid: ${b.paidCount}/${b.studentCount}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Rate: ${b.commissionRate.toStringAsFixed(0)}%',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Sales: ${b.sales.toStringAsFixed(2)}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    Text(
+                                      'Commission: ${b.commission.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )),
+                    ],
                   ],
                   const SizedBox(height: 16),
                   TextField(
@@ -489,4 +578,22 @@ class _TeacherPaymentScreenState extends State<TeacherPaymentScreen> {
       ),
     );
   }
+}
+
+class _ClassBreakdown {
+  final String className;
+  final double sales;
+  final double commission;
+  final double commissionRate;
+  final int studentCount;
+  final int paidCount;
+
+  const _ClassBreakdown({
+    required this.className,
+    required this.sales,
+    required this.commission,
+    required this.commissionRate,
+    required this.studentCount,
+    required this.paidCount,
+  });
 }

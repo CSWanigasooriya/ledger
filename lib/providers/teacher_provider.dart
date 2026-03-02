@@ -9,10 +9,12 @@ class TeacherProvider extends ChangeNotifier {
   List<Teacher> _teachers = [];
   bool _isLoading = false;
   String? _error;
+  bool _showDeleted = false;
 
   List<Teacher> get teachers => _teachers;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get showDeleted => _showDeleted;
 
   StreamSubscription? _subscription;
 
@@ -22,6 +24,23 @@ class TeacherProvider extends ChangeNotifier {
       _teachers = teachers;
       notifyListeners();
     });
+  }
+
+  /// Toggle to show/hide soft-deleted teachers.
+  void toggleShowDeleted() {
+    _showDeleted = !_showDeleted;
+    _subscription?.cancel();
+    if (_showDeleted) {
+      _subscription = _service.getAllTeachersStream().listen((teachers) {
+        _teachers = teachers;
+        notifyListeners();
+      });
+    } else {
+      _subscription = _service.getTeachersStream().listen((teachers) {
+        _teachers = teachers;
+        notifyListeners();
+      });
+    }
   }
 
   @override
@@ -72,6 +91,17 @@ class TeacherProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Failed to delete teacher: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> restoreTeacher(String id) async {
+    try {
+      await _service.restoreTeacher(id);
+      return true;
+    } catch (e) {
+      _error = 'Failed to restore teacher: $e';
       notifyListeners();
       return false;
     }

@@ -26,6 +26,7 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
 
   bool _isEditing = false;
   Teacher? _existingTeacher;
+  TeacherStatus _status = TeacherStatus.active;
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
       _bankNameController.text = teacher.bankDetails.bankName;
       _accountNoController.text = teacher.bankDetails.accountNo;
       _branchController.text = teacher.bankDetails.branch;
+      _status = teacher.status;
     }
   }
 
@@ -78,6 +80,7 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
       contactNo: _contactController.text.trim(),
       address: _addressController.text.trim(),
       nic: _nicController.text.trim(),
+      status: _status,
       bankDetails: BankDetails(
         bankName: _bankNameController.text.trim(),
         accountNo: _accountNoController.text.trim(),
@@ -180,6 +183,27 @@ class _TeacherFormScreenState extends State<TeacherFormScreen> {
                             prefixIcon: Icon(Icons.badge_outlined),
                           ),
                         ),
+                        if (_isEditing) ...[
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<TeacherStatus>(
+                            initialValue: _status,
+                            decoration: const InputDecoration(
+                              labelText: 'Status',
+                              prefixIcon: Icon(Icons.toggle_on_outlined),
+                            ),
+                            items: TeacherStatus.values
+                                .map(
+                                  (s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s.displayName),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) setState(() => _status = v);
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 32),
                         Text(
                           'Bank Details',

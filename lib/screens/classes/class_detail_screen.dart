@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../providers/class_provider.dart';
 import '../../providers/teacher_provider.dart';
 import '../../providers/student_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/student.dart';
 
 class ClassDetailScreen extends StatefulWidget {
@@ -44,6 +46,8 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final authProvider = context.watch<AuthProvider>();
+    final isSuperAdmin = authProvider.isSuperAdmin;
 
     return Consumer3<ClassProvider, TeacherProvider, StudentProvider>(
       builder: (context, classProv, teacherProv, studentProv, _) {
@@ -62,31 +66,40 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           appBar: AppBar(
             title: Text(cls.className),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_rounded),
-                onPressed: () => context.go('/classes/${cls.id}/edit'),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: colorScheme.error,
+              if (!cls.isDeleted) ...[
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded),
+                  onPressed: () => context.go('/classes/${cls.id}/edit'),
                 ),
-                onPressed: () => _confirmDelete(context, classProv),
-              ),
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: colorScheme.error,
+                  ),
+                  onPressed: () => _confirmDelete(context, classProv),
+                ),
+              ] else if (isSuperAdmin)
+                FilledButton.icon(
+                  onPressed: () => _confirmRestore(context, classProv),
+                  icon: const Icon(Icons.restore_rounded, size: 18),
+                  label: const Text('Restore'),
+                ),
               const SizedBox(width: 8),
             ],
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _showEnrollDialog(
-              context,
-              classProv,
-              studentProv,
-              cls.id,
-              cls.studentIds,
-            ),
-            icon: const Icon(Icons.person_add_rounded),
-            label: const Text('Enroll Student'),
-          ),
+          floatingActionButton: cls.isDeleted
+              ? null
+              : FloatingActionButton.extended(
+                  onPressed: () => _showEnrollDialog(
+                    context,
+                    classProv,
+                    studentProv,
+                    cls.id,
+                    cls.studentIds,
+                  ),
+                  icon: const Icon(Icons.person_add_rounded),
+                  label: const Text('Enroll Student'),
+                ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Center(
@@ -95,6 +108,32 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Deleted banner
+                    if (cls.isDeleted)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_rounded,
+                                color: colorScheme.onErrorContainer),
+                            const SizedBox(width: 8),
+                            Text(
+                              'This class has been deleted',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Class Info Card
                     Card(
                       child: Padding(
@@ -166,6 +205,13 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                                   '${cls.teacherCommissionRate}%',
                                   Icons.percent_rounded,
                                 ),
+                                const SizedBox(width: 12),
+                                _buildStatChip(
+                                  context,
+                                  'Weeks',
+                                  '${cls.numberOfWeeks}',
+                                  Icons.calendar_view_week,
+                                ),
                               ],
                             ),
                           ],
@@ -174,6 +220,71 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                     ),
 
                     const SizedBox(height: 24),
+
+                    // Audit Log (for superAdmin)
+                    if (isSuperAdmin && cls.auditLog.isNotEmpty) ...[
+                      Text(
+                        'Audit Trail',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: cls.auditLog
+                                .take(10)
+                                .map(
+                                  (entry) => Padding(
+                                    padding:
+                                        const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.history_rounded,
+                                          size: 16,
+                                          color:
+                                              colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '${entry.field}: "${entry.oldValue}" → "${entry.newValue}"',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight:
+                                                      FontWeight.w500,
+                                                ),
+                                              ),
+                                              Text(
+                                                '${entry.changedBy} • ${DateFormat('dd MMM yyyy HH:mm').format(entry.changedAt)}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
 
                     // Enrolled Students
                     Row(
@@ -227,35 +338,70 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                             leading: CircleAvatar(
                               backgroundColor: colorScheme.primaryContainer,
                               child: Text(
-                                student.firstName.isNotEmpty
-                                    ? student.firstName[0].toUpperCase()
-                                    : '?',
+                                student.studentId.isNotEmpty
+                                    ? student.studentId[0].toUpperCase()
+                                    : student.firstName.isNotEmpty
+                                        ? student.firstName[0].toUpperCase()
+                                        : '?',
                                 style: TextStyle(
                                   color: colorScheme.onPrimaryContainer,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                            title: Text(student.fullName),
+                            title: Row(
+                              children: [
+                                if (student.studentId.isNotEmpty) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      student.studentId,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Expanded(child: Text(student.fullName)),
+                                if (student.isFreeCard)
+                                  Icon(
+                                    Icons.card_giftcard,
+                                    size: 16,
+                                    color: Colors.orange.shade700,
+                                  ),
+                              ],
+                            ),
                             subtitle: Text(
                               student.email.isNotEmpty
                                   ? student.email
                                   : student.mobileNo,
                             ),
-                            trailing: IconButton(
-                              icon: Icon(
-                                Icons.remove_circle_outline,
-                                color: colorScheme.error,
-                              ),
-                              tooltip: 'Remove from class',
-                              onPressed: () async {
-                                await classProv.removeStudent(
-                                  cls.id,
-                                  student.id,
-                                );
-                                _loadStudents();
-                              },
-                            ),
+                            trailing: cls.isDeleted
+                                ? null
+                                : IconButton(
+                                    icon: Icon(
+                                      Icons.remove_circle_outline,
+                                      color: colorScheme.error,
+                                    ),
+                                    tooltip: 'Remove from class',
+                                    onPressed: () async {
+                                      await classProv.removeStudent(
+                                        cls.id,
+                                        student.id,
+                                      );
+                                      _loadStudents();
+                                    },
+                                  ),
                             onTap: () => context.go('/students/${student.id}'),
                           ),
                         ),
@@ -315,7 +461,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     List<String> enrolledIds,
   ) {
     final available = studentProv.students
-        .where((s) => !enrolledIds.contains(s.id))
+        .where((s) => !enrolledIds.contains(s.id) && !s.isDeleted)
         .toList();
 
     showDialog(
@@ -334,13 +480,19 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                     return ListTile(
                       leading: CircleAvatar(
                         child: Text(
-                          student.firstName.isNotEmpty
-                              ? student.firstName[0].toUpperCase()
-                              : '?',
+                          student.studentId.isNotEmpty
+                              ? student.studentId[0].toUpperCase()
+                              : student.firstName.isNotEmpty
+                                  ? student.firstName[0].toUpperCase()
+                                  : '?',
                         ),
                       ),
                       title: Text(student.fullName),
-                      subtitle: Text(student.email),
+                      subtitle: Text(
+                        student.studentId.isNotEmpty
+                            ? student.studentId
+                            : student.email,
+                      ),
                       onTap: () async {
                         Navigator.pop(ctx);
                         await classProv.enrollStudent(classId, student.id);
@@ -365,7 +517,9 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Class'),
-        content: const Text('Are you sure you want to delete this class?'),
+        content: const Text(
+          'Are you sure you want to delete this class? It can be restored later by a super admin.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -381,6 +535,37 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRestore(BuildContext context, ClassProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Class'),
+        content: const Text('Do you want to restore this deleted class?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              // Restore via service directly (update isDeleted = false)
+              await provider.updateClass(
+                provider.getClassById(widget.classId)!.copyWith(isDeleted: false),
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Class restored')),
+                );
+              }
+            },
+            child: const Text('Restore'),
           ),
         ],
       ),

@@ -23,16 +23,18 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
   final _emailController = TextEditingController();
   final _guardianNameController = TextEditingController();
   final _guardianMobileController = TextEditingController();
+  final _classSearchController = TextEditingController();
 
   bool _isEditing = false;
   Student? _existingStudent;
   final Set<String> _selectedClassIds = {};
   bool _isSubmitting = false;
+  String _selectedGrade = '10'; // Default grade
+  bool _isFreeCard = false;
 
   @override
   void initState() {
     super.initState();
-    // Ensure classes are loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ClassProvider>().init();
     });
@@ -57,6 +59,8 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       _guardianNameController.text = student.guardianName;
       _guardianMobileController.text = student.guardianMobileNo;
       _selectedClassIds.addAll(student.classIds);
+      _selectedGrade = student.grade.isEmpty ? '10' : student.grade;
+      _isFreeCard = student.isFreeCard;
     }
   }
 
@@ -69,6 +73,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     _emailController.dispose();
     _guardianNameController.dispose();
     _guardianMobileController.dispose();
+    _classSearchController.dispose();
     super.dispose();
   }
 
@@ -91,8 +96,12 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         guardianName: _guardianNameController.text.trim(),
         guardianMobileNo: _guardianMobileController.text.trim(),
         qrCode: _existingStudent?.qrCode ?? '',
+        studentId: _existingStudent?.studentId ?? '',
+        grade: _selectedGrade,
+        isFreeCard: _isFreeCard,
         classIds: _selectedClassIds.toList(),
         createdAt: _existingStudent?.createdAt,
+        status: _existingStudent?.status ?? StudentStatus.active,
       );
 
       bool success;
@@ -116,7 +125,6 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
             .where((id) => !_selectedClassIds.contains(id))
             .toList();
 
-        // Enroll and remove from classes
         for (final classId in addedClasses) {
           await classProvider.enrollStudent(classId, studentIdToUse);
         }
@@ -125,15 +133,26 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Student ${_isEditing ? 'updated' : 'created'} successfully',
+          if (!_isEditing) {
+            // Navigate to QR print screen after student creation
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Student created: ${createdStudent!.studentId}',
+                ),
+                behavior: SnackBarBehavior.floating,
               ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          context.pop();
+            );
+            context.go('/students/${createdStudent.id}/qr');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Student updated successfully'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            context.pop();
+          }
         }
       }
     } finally {
@@ -169,6 +188,30 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Student ID display (for editing)
+                        if (_isEditing && _existingStudent != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.badge_outlined),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Student ID: ${_existingStudent!.studentId}',
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
                         // Personal Information
                         Text(
                           'Personal Information',
@@ -177,6 +220,35 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
+
+                        // Grade selector
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedGrade,
+                          decoration: const InputDecoration(
+                            labelText: 'Grade *',
+                            prefixIcon: Icon(Icons.school_outlined),
+                          ),
+                          items: GradeConfig.gradePrefixMap.keys
+                              .map(
+                                (grade) => DropdownMenuItem(
+                                  value: grade,
+                                  child: Text(
+                                    'Grade $grade (${GradeConfig.prefixForGrade(grade)})',
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _isEditing
+                              ? null // Can't change grade after creation
+                              : (value) {
+                                  if (value != null) {
+                                    setState(() => _selectedGrade = value);
+                                  }
+                                },
+                          validator: (v) => v == null ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 16),
+
                         Row(
                           children: [
                             Expanded(
@@ -234,9 +306,28 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           ),
                         ),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
 
-                        // Class Assignation
+                        // Free Card toggle
+                        SwitchListTile(
+                          title: const Text('Free Card'),
+                          subtitle: const Text(
+                            'Student is exempt from class fees',
+                          ),
+                          value: _isFreeCard,
+                          onChanged: (v) => setState(() => _isFreeCard = v),
+                          secondary: Icon(
+                            _isFreeCard
+                                ? Icons.card_giftcard
+                                : Icons.card_giftcard_outlined,
+                            color:
+                                _isFreeCard ? theme.colorScheme.primary : null,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Class Assignment - Searchable dropdown with chips
                         Text(
                           'Class Assignment',
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -244,29 +335,80 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
+
+                        // Selected classes as chips
+                        if (_selectedClassIds.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Wrap(
+                              spacing: 8.0,
+                              runSpacing: 8.0,
+                              children: _selectedClassIds.map((classId) {
+                                final classModel =
+                                    classProvider.getClassById(classId);
+                                return Chip(
+                                  label: Text(
+                                    classModel?.className ?? 'Unknown',
+                                  ),
+                                  deleteIcon: const Icon(Icons.close, size: 18),
+                                  onDeleted: () {
+                                    setState(() {
+                                      _selectedClassIds.remove(classId);
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ),
+
+                        // Searchable class dropdown
                         if (classProvider.classes.isEmpty)
                           const Text('No classes available.')
                         else
-                          Wrap(
-                            spacing: 8.0,
-                            runSpacing: 8.0,
-                            children: classProvider.classes.map((classModel) {
-                              final isSelected =
-                                  _selectedClassIds.contains(classModel.id);
-                              return FilterChip(
-                                label: Text(classModel.className),
-                                selected: isSelected,
-                                onSelected: (bool selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedClassIds.add(classModel.id);
-                                    } else {
-                                      _selectedClassIds.remove(classModel.id);
-                                    }
-                                  });
-                                },
+                          Autocomplete<String>(
+                            optionsBuilder: (textEditingValue) {
+                              if (textEditingValue.text.isEmpty) {
+                                return classProvider.classes
+                                    .where(
+                                      (c) => !_selectedClassIds.contains(c.id),
+                                    )
+                                    .map((c) => c.id);
+                              }
+                              final query = textEditingValue.text.toLowerCase();
+                              return classProvider.classes
+                                  .where(
+                                    (c) =>
+                                        !_selectedClassIds.contains(c.id) &&
+                                        c.className
+                                            .toLowerCase()
+                                            .contains(query),
+                                  )
+                                  .map((c) => c.id);
+                            },
+                            displayStringForOption: (classId) {
+                              final c = classProvider.getClassById(classId);
+                              return c?.className ?? 'Unknown';
+                            },
+                            onSelected: (classId) {
+                              setState(() {
+                                _selectedClassIds.add(classId);
+                              });
+                              // Clear the text field after selection
+                              _classSearchController.clear();
+                            },
+                            fieldViewBuilder: (context, controller, focusNode,
+                                onFieldSubmitted) {
+                              // Keep reference to clear it later
+                              return TextFormField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                decoration: const InputDecoration(
+                                  labelText: 'Search & Add Class',
+                                  prefixIcon: Icon(Icons.search),
+                                  hintText: 'Type to search classes...',
+                                ),
                               );
-                            }).toList(),
+                            },
                           ),
 
                         const SizedBox(height: 32),

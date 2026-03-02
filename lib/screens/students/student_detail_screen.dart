@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../models/student.dart';
 import '../../providers/student_provider.dart';
 import '../../providers/class_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class StudentDetailScreen extends StatelessWidget {
   final String studentId;
@@ -14,6 +15,7 @@ class StudentDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final authProvider = context.watch<AuthProvider>();
 
     return Consumer2<StudentProvider, ClassProvider>(
       builder: (context, studentProv, classProv, _) {
@@ -46,14 +48,26 @@ class StudentDetailScreen extends StatelessWidget {
                 tooltip: 'Edit',
                 onPressed: () => context.go('/students/${student.id}/edit'),
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: colorScheme.error,
+              if (student.isDeleted && authProvider.isSuperAdmin)
+                IconButton(
+                  icon: Icon(
+                    Icons.restore_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  tooltip: 'Restore',
+                  onPressed: () =>
+                      _confirmRestore(context, studentProv, student),
                 ),
-                tooltip: 'Delete',
-                onPressed: () => _confirmDelete(context, studentProv, student),
-              ),
+              if (!student.isDeleted)
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: colorScheme.error,
+                  ),
+                  tooltip: 'Delete',
+                  onPressed: () =>
+                      _confirmDelete(context, studentProv, student),
+                ),
               const SizedBox(width: 8),
             ],
           ),
@@ -65,6 +79,32 @@ class StudentDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Deleted banner
+                    if (student.isDeleted)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline,
+                                color: colorScheme.onErrorContainer),
+                            const SizedBox(width: 8),
+                            Text(
+                              'This student has been deleted',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Header Card
                     Card(
                       child: Padding(
@@ -75,9 +115,11 @@ class StudentDetailScreen extends StatelessWidget {
                               radius: 36,
                               backgroundColor: colorScheme.primaryContainer,
                               child: Text(
-                                student.firstName.isNotEmpty
-                                    ? student.firstName[0].toUpperCase()
-                                    : '?',
+                                student.studentId.isNotEmpty
+                                    ? student.studentId.substring(0, 1)
+                                    : student.firstName.isNotEmpty
+                                        ? student.firstName[0].toUpperCase()
+                                        : '?',
                                 style: theme.textTheme.headlineMedium?.copyWith(
                                   color: colorScheme.onPrimaryContainer,
                                   fontWeight: FontWeight.w700,
@@ -95,9 +137,79 @@ class StudentDetailScreen extends StatelessWidget {
                                         ?.copyWith(fontWeight: FontWeight.w700),
                                   ),
                                   const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.primaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          student.studentId,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme
+                                                .onPrimaryContainer,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Grade ${student.grade}',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                          color:
+                                              colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      if (student.isFreeCard) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                colorScheme.tertiaryContainer,
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.card_giftcard,
+                                                size: 14,
+                                                color: colorScheme
+                                                    .onTertiaryContainer,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Free Card',
+                                                style: theme
+                                                    .textTheme.labelSmall
+                                                    ?.copyWith(
+                                                  color: colorScheme
+                                                      .onTertiaryContainer,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    'ID: ${student.qrCode}',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                    'Status: ${student.status.name}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
@@ -105,7 +217,9 @@ class StudentDetailScreen extends StatelessWidget {
                               ),
                             ),
                             QrImageView(
-                              data: student.qrCode,
+                              data: student.studentId.isNotEmpty
+                                  ? student.studentId
+                                  : student.qrCode,
                               version: QrVersions.auto,
                               size: 80,
                               eyeStyle: QrEyeStyle(
@@ -122,7 +236,25 @@ class StudentDetailScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+
+                    // Free Card toggle (super admin only)
+                    if (authProvider.isSuperAdmin)
+                      Card(
+                        child: SwitchListTile(
+                          title: const Text('Free Card'),
+                          subtitle: const Text(
+                            'Exempt student from class fees',
+                          ),
+                          value: student.isFreeCard,
+                          onChanged: (value) {
+                            studentProv.setFreeCard(student.id, value);
+                          },
+                          secondary: const Icon(Icons.card_giftcard),
+                        ),
+                      ),
+
+                    const SizedBox(height: 12),
 
                     // Contact Info
                     _SectionCard(
@@ -237,7 +369,10 @@ class StudentDetailScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Student'),
-        content: Text('Are you sure you want to delete ${student.fullName}?'),
+        content: Text(
+          'Are you sure you want to delete ${student.fullName}? '
+          'The student will be soft-deleted and can be restored later.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -253,6 +388,35 @@ class StudentDetailScreen extends StatelessWidget {
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRestore(
+    BuildContext context,
+    StudentProvider provider,
+    Student student,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Student'),
+        content: Text(
+          'Are you sure you want to restore ${student.fullName}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await provider.restoreStudent(student.id);
+            },
+            child: const Text('Restore'),
           ),
         ],
       ),

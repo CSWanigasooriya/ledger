@@ -7,6 +7,7 @@ import '../../providers/class_provider.dart';
 import '../../providers/student_provider.dart';
 import '../../providers/attendance_provider.dart';
 import '../../models/student.dart';
+import '../../services/payment_service.dart';
 
 class AttendanceScannerScreen extends StatefulWidget {
   final String classId;
@@ -25,6 +26,7 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
     torchEnabled: false,
   );
 
+  final PaymentService _paymentService = PaymentService();
   final List<_ScannedEntry> _scannedStudents = [];
   final Set<String> _scannedIds = {};
   bool _isSaving = false;
@@ -54,36 +56,48 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
   void _onDetect(BarcodeCapture capture) {
     for (final barcode in capture.barcodes) {
       final rawValue = barcode.rawValue;
-      if (rawValue == null) continue;
+      if (rawValue == null || rawValue.isEmpty) continue;
 
-      // QR codes are formatted as "STU-{studentId}"
-      if (!rawValue.startsWith('STU-')) continue;
-
-      final studentId = rawValue.substring(4);
+      // QR codes now contain the studentId directly (e.g., "B1001")
+      // Also support legacy "STU-{id}" format
+      String scannedValue = rawValue;
+      if (rawValue.startsWith('STU-')) {
+        scannedValue = rawValue.substring(4);
+      }
 
       // Skip if already scanned
-      if (_scannedIds.contains(studentId)) continue;
+      if (_scannedIds.contains(scannedValue)) continue;
 
-      // Validate student is enrolled in this class
-      final student =
-          _classStudents.where((s) => s.id == studentId).firstOrNull;
+      // Find student by studentId first, then fall back to document id
+      Student? student = _classStudents
+          .where((s) => s.studentId == scannedValue)
+          .firstOrNull;
+      student ??=
+          _classStudents.where((s) => s.id == scannedValue).firstOrNull;
+
       if (student == null) {
         // Student not in this class — show a brief warning
-        _showNotEnrolledWarning(studentId);
+        _showNotEnrolledWarning(scannedValue);
         return;
       }
 
       // Mark as scanned
-      _scannedIds.add(studentId);
+      _scannedIds.add(scannedValue);
 
-      setState(() {
-        _scannedStudents.insert(
-          0,
-          _ScannedEntry(
-            student: student,
-            scannedAt: DateTime.now(),
-          ),
-        );
+      // Check payment status
+      _checkPaymentStatus(student).then((paymentInfo) {
+        if (mounted) {
+          setState(() {
+            _scannedStudents.insert(
+              0,
+              _ScannedEntry(
+                student: student!,
+                scannedAt: DateTime.now(),
+                paymentInfo: paymentInfo,
+              ),
+            );
+          });
+        }
       });
 
       // Haptic feedback
@@ -91,13 +105,31 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
     }
   }
 
-  void _showNotEnrolledWarning(String studentId) {
+  Future<String> _checkPaymentStatus(Student student) async {
+    if (student.isFreeCard) return 'Free Card';
+
+    final now = DateTime.now();
+    try {
+      final payments = await _paymentService.getPaymentsByClassAndMonth(
+        widget.classId,
+        now.month,
+        now.year,
+      );
+      final paid = payments.any((p) => p.studentId == student.id);
+      return paid ? 'Paid' : 'Unpaid';
+    } catch (_) {
+      return 'Unknown';
+    }
+  }
+
+  void _showNotEnrolledWarning(String value) {
     if (!mounted) return;
-    // Find the student from the global provider
+    // Try to find student from the global provider
     final studentProv = context.read<StudentProvider>();
-    final student =
-        studentProv.students.where((s) => s.id == studentId).firstOrNull;
-    final name = student?.fullName ?? 'Unknown';
+    final student = studentProv.students
+        .where((s) => s.studentId == value || s.id == value)
+        .firstOrNull;
+    final name = student?.fullName ?? value;
 
     HapticFeedback.heavyImpact();
 
@@ -118,17 +150,23 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
     try {
       final attendanceProv = context.read<AttendanceProvider>();
       final now = DateTime.now();
+      final weekNumber = ((now.day - 1) ~/ 7) + 1;
 
       // Build attendance records: scanned = present, rest = absent
       final records = <Attendance>[];
       for (final student in _classStudents) {
+        final isScanned = _scannedStudents.any(
+          (e) => e.student.id == student.id,
+        );
         records.add(Attendance(
           id: '',
           classId: widget.classId,
           studentId: student.id,
           date: now,
-          isPresent: _scannedIds.contains(student.id),
+          weekNumber: weekNumber,
+          isPresent: isScanned,
           markedBy: 'qr_scanner',
+          studentDisplayId: student.studentId,
         ));
       }
 
@@ -162,6 +200,19 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
   void dispose() {
     _scannerController.dispose();
     super.dispose();
+  }
+
+  Color _paymentColor(String info) {
+    switch (info) {
+      case 'Paid':
+        return Colors.green;
+      case 'Free Card':
+        return Colors.orange;
+      case 'Unpaid':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -343,6 +394,7 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
                             itemCount: _scannedStudents.length,
                             itemBuilder: (context, index) {
                               final entry = _scannedStudents[index];
+                              final pColor = _paymentColor(entry.paymentInfo);
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 6),
                                 child: ListTile(
@@ -358,19 +410,75 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
                                       size: 20,
                                     ),
                                   ),
-                                  title: Text(
-                                    entry.student.fullName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
+                                  title: Row(
+                                    children: [
+                                      if (entry.student.studentId
+                                          .isNotEmpty) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 1,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                colorScheme.primaryContainer,
+                                            borderRadius:
+                                                BorderRadius.circular(3),
+                                          ),
+                                          child: Text(
+                                            entry.student.studentId,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: colorScheme
+                                                  .onPrimaryContainer,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      Expanded(
+                                        child: Text(
+                                          entry.student.fullName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  subtitle: Text(
-                                    'Scanned at ${TimeOfDay.fromDateTime(entry.scannedAt).format(context)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                                  subtitle: Row(
+                                    children: [
+                                      Text(
+                                        'Scanned at ${TimeOfDay.fromDateTime(entry.scannedAt).format(context)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              pColor.withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          entry.paymentInfo,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: pColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   trailing: IconButton(
                                     icon: Icon(
@@ -380,7 +488,11 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
                                     ),
                                     onPressed: () {
                                       setState(() {
-                                        _scannedIds.remove(entry.student.id);
+                                        _scannedIds.remove(
+                                          entry.student.studentId.isNotEmpty
+                                              ? entry.student.studentId
+                                              : entry.student.id,
+                                        );
                                         _scannedStudents.removeAt(index);
                                       });
                                     },
@@ -440,6 +552,11 @@ class _AttendanceScannerScreenState extends State<AttendanceScannerScreen> {
 class _ScannedEntry {
   final Student student;
   final DateTime scannedAt;
+  final String paymentInfo;
 
-  const _ScannedEntry({required this.student, required this.scannedAt});
+  const _ScannedEntry({
+    required this.student,
+    required this.scannedAt,
+    this.paymentInfo = 'Unknown',
+  });
 }

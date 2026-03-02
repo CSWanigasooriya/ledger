@@ -7,6 +7,7 @@ import '../../models/payment.dart';
 import '../../models/student.dart';
 import '../../providers/class_provider.dart';
 import '../../providers/student_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/payment_service.dart';
 
 class ClassPaymentScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
   int _selectedYear = DateTime.now().year;
   List<Student> _students = [];
   List<Payment> _payments = [];
+  bool _showUnpaidOnly = false;
 
   bool _loading = false;
   String? _error;
@@ -67,9 +69,13 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
     return _payments.any((p) => p.studentId == studentId);
   }
 
+  bool _isFreeCardPayment(String studentId) {
+    return _payments.any((p) => p.studentId == studentId && p.isFreeCard);
+  }
+
   double _paidAmount(String studentId) {
     return _payments
-        .where((p) => p.studentId == studentId)
+        .where((p) => p.studentId == studentId && !p.isFreeCard)
         .fold(0.0, (total, p) => total + p.amount);
   }
 
@@ -85,6 +91,16 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (student.studentId.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Student ID: ${student.studentId}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
             Text(
               'Month: ${DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth))}',
               style: Theme.of(context).textTheme.bodyMedium,
@@ -138,10 +154,38 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
     }
   }
 
+  Future<void> _recordFreeCardPayment(Student student) async {
+    await _paymentService.recordFreeCardPayment(
+      studentId: student.id,
+      classId: _selectedClassId!,
+      month: _selectedMonth,
+      year: _selectedYear,
+    );
+    _loadData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Free card recorded for ${student.fullName}'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _markInstitutePaid(Payment payment) async {
+    await _paymentService.markInstitutePaid(payment.id);
+    _loadData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marked as institute paid')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final authProv = context.watch<AuthProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -185,6 +229,7 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                         isDense: true,
                       ),
                       items: classProv.classes
+                          .where((c) => !c.isDeleted)
                           .map(
                             (c) => DropdownMenuItem(
                               value: c.id,
@@ -243,6 +288,13 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                     },
                   ),
                 ),
+                // Filter toggle for unpaid only
+                if (_selectedClassId != null)
+                  FilterChip(
+                    label: const Text('Unpaid Only'),
+                    selected: _showUnpaidOnly,
+                    onSelected: (v) => setState(() => _showUnpaidOnly = v),
+                  ),
               ],
             ),
           ),
@@ -307,12 +359,19 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                               final cls =
                                   classProv.getClassById(_selectedClassId!);
                               final classFees = cls?.classFees ?? 0;
-                              final totalPaid = _payments.fold(
-                                0.0,
-                                (total, p) => total + p.amount,
-                              );
+                              final totalPaid = _payments
+                                  .where((p) => !p.isFreeCard)
+                                  .fold(0.0, (total, p) => total + p.amount);
                               final paidCount =
                                   _students.where((s) => _hasPaid(s.id)).length;
+                              final freeCardCount = _students
+                                  .where((s) => s.isFreeCard)
+                                  .length;
+
+                              // Apply filter
+                              final displayStudents = _showUnpaidOnly
+                                  ? _students.where((s) => !_hasPaid(s.id)).toList()
+                                  : _students;
 
                               return Column(
                                 children: [
@@ -323,7 +382,7 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                                       children: [
                                         _buildMiniStat(
                                           context,
-                                          'Total Collected',
+                                          'Collected',
                                           totalPaid.toStringAsFixed(2),
                                           Colors.green,
                                         ),
@@ -341,6 +400,15 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                                           '${_students.length - paidCount}',
                                           Colors.orange,
                                         ),
+                                        if (freeCardCount > 0) ...[
+                                          const SizedBox(width: 12),
+                                          _buildMiniStat(
+                                            context,
+                                            'Free Card',
+                                            '$freeCardCount',
+                                            Colors.purple,
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -349,63 +417,136 @@ class _ClassPaymentScreenState extends State<ClassPaymentScreen> {
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 20,
                                       ),
-                                      itemCount: _students.length,
+                                      itemCount: displayStudents.length,
                                       itemBuilder: (context, index) {
-                                        final student = _students[index];
+                                        final student = displayStudents[index];
                                         final paid = _hasPaid(student.id);
+                                        final isFreeCard = student.isFreeCard;
+                                        final hasFreeCardRecord = _isFreeCardPayment(student.id);
                                         final paidAmt = _paidAmount(student.id);
+
+                                        // Get payment for institute-paid marking
+                                        final studentPayments = _payments
+                                            .where((p) => p.studentId == student.id && !p.isFreeCard)
+                                            .toList();
 
                                         return Card(
                                           child: ListTile(
                                             leading: CircleAvatar(
-                                              backgroundColor: paid
-                                                  ? Colors.green
-                                                      .withValues(alpha: 0.15)
-                                                  : Colors.orange.withValues(
-                                                      alpha: 0.15,
-                                                    ),
+                                              backgroundColor: isFreeCard
+                                                  ? Colors.purple.withValues(alpha: 0.15)
+                                                  : paid
+                                                      ? Colors.green.withValues(alpha: 0.15)
+                                                      : Colors.orange.withValues(alpha: 0.15),
                                               child: Icon(
-                                                paid
-                                                    ? Icons.check_circle_rounded
-                                                    : Icons.pending_rounded,
-                                                color: paid
-                                                    ? Colors.green
-                                                    : Colors.orange,
+                                                isFreeCard
+                                                    ? Icons.card_giftcard_rounded
+                                                    : paid
+                                                        ? Icons.check_circle_rounded
+                                                        : Icons.pending_rounded,
+                                                color: isFreeCard
+                                                    ? Colors.purple
+                                                    : paid
+                                                        ? Colors.green
+                                                        : Colors.orange,
                                               ),
                                             ),
-                                            title: Text(
-                                              student.fullName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            subtitle: Text(
-                                              paid
-                                                  ? 'Paid: ${paidAmt.toStringAsFixed(2)}'
-                                                  : 'Pending - Fee: ${classFees.toStringAsFixed(2)}',
-                                            ),
-                                            trailing: paid
-                                                ? Chip(
-                                                    label: const Text('Paid'),
-                                                    backgroundColor: Colors
-                                                        .green
-                                                        .withValues(alpha: 0.1),
-                                                    side: BorderSide.none,
-                                                    labelStyle: const TextStyle(
-                                                      color: Colors.green,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                            title: Row(
+                                              children: [
+                                                if (student.studentId.isNotEmpty) ...[
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                    decoration: BoxDecoration(
+                                                      color: colorScheme.primaryContainer,
+                                                      borderRadius: BorderRadius.circular(3),
                                                     ),
-                                                  )
-                                                : FilledButton.tonal(
-                                                    onPressed: () =>
-                                                        _markPayment(
-                                                      student,
-                                                      classFees,
+                                                    child: Text(
+                                                      student.studentId,
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: colorScheme.onPrimaryContainer,
+                                                      ),
                                                     ),
-                                                    child:
-                                                        const Text('Mark Paid'),
                                                   ),
+                                                  const SizedBox(width: 6),
+                                                ],
+                                                Expanded(
+                                                  child: Text(
+                                                    student.fullName,
+                                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                                  ),
+                                                ),
+                                                if (isFreeCard)
+                                                  Icon(Icons.card_giftcard, size: 16, color: Colors.purple.shade300),
+                                              ],
+                                            ),
+                                            subtitle: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  isFreeCard && (hasFreeCardRecord || paid)
+                                                      ? 'Free Card - No payment required'
+                                                      : paid
+                                                          ? 'Paid: ${paidAmt.toStringAsFixed(2)}'
+                                                          : 'Pending - Fee: ${classFees.toStringAsFixed(2)}',
+                                                ),
+                                                // Show institute-paid status for superAdmin
+                                                if (authProv.isSuperAdmin && studentPayments.isNotEmpty)
+                                                  ...studentPayments.map((p) => Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            p.institutePaid
+                                                                ? Icons.account_balance_rounded
+                                                                : Icons.account_balance_outlined,
+                                                            size: 12,
+                                                            color: p.institutePaid ? Colors.green : Colors.grey,
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            p.institutePaid
+                                                                ? 'Institute paid'
+                                                                : 'Institute unpaid',
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: p.institutePaid ? Colors.green : Colors.grey,
+                                                            ),
+                                                          ),
+                                                          if (!p.institutePaid && authProv.isSuperAdmin)
+                                                            TextButton(
+                                                              onPressed: () => _markInstitutePaid(p),
+                                                              style: TextButton.styleFrom(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                                minimumSize: Size.zero,
+                                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                              ),
+                                                              child: const Text('Mark', style: TextStyle(fontSize: 11)),
+                                                            ),
+                                                        ],
+                                                      )),
+                                              ],
+                                            ),
+                                            trailing: isFreeCard && !hasFreeCardRecord
+                                                ? FilledButton.tonal(
+                                                    onPressed: () => _recordFreeCardPayment(student),
+                                                    child: const Text('Record Free'),
+                                                  )
+                                                : paid
+                                                    ? Chip(
+                                                        label: Text(isFreeCard ? 'Free' : 'Paid'),
+                                                        backgroundColor: (isFreeCard ? Colors.purple : Colors.green)
+                                                            .withValues(alpha: 0.1),
+                                                        side: BorderSide.none,
+                                                        labelStyle: TextStyle(
+                                                          color: isFreeCard ? Colors.purple : Colors.green,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      )
+                                                    : FilledButton.tonal(
+                                                        onPressed: () => _markPayment(student, classFees),
+                                                        child: const Text('Mark Paid'),
+                                                      ),
                                           ),
                                         );
                                       },

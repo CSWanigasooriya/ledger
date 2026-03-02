@@ -14,6 +14,8 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   int _month = DateTime.now().month;
   int _year = DateTime.now().year;
+  bool _useDateRange = false;
+  DateTimeRange? _dateRange;
 
   @override
   void initState() {
@@ -23,7 +25,32 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<void> _loadReport() async {
     final p = context.read<ReportProvider>();
-    await p.loadMonthlyReport(_month, _year);
+    if (_useDateRange && _dateRange != null) {
+      await p.loadReportByDateRange(_dateRange!.start, _dateRange!.end);
+    } else {
+      await p.loadMonthlyReport(_month, _year);
+    }
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+      initialDateRange: _dateRange ??
+          DateTimeRange(
+            start: DateTime(now.year, now.month, 1),
+            end: now,
+          ),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateRange = picked;
+        _useDateRange = true;
+      });
+      _loadReport();
+    }
   }
 
   @override
@@ -43,58 +70,79 @@ class _ReportScreenState extends State<ReportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Month/Year selector
+                    // Month/Year selector or Date Range
                     Wrap(
                       spacing: 16,
                       runSpacing: 12,
-                      crossAxisAlignment: WrapCrossAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        SizedBox(
-                          width: 160,
-                          child: DropdownButtonFormField<int>(
-                            initialValue: _month,
-                            decoration: const InputDecoration(
-                              labelText: 'Month',
-                              isDense: true,
+                        FilterChip(
+                          label: const Text('Date Range'),
+                          selected: _useDateRange,
+                          onSelected: (v) {
+                            setState(() => _useDateRange = v);
+                            if (!v) _loadReport();
+                            if (v && _dateRange == null) _pickDateRange();
+                          },
+                        ),
+                        if (_useDateRange) ...[
+                          ActionChip(
+                            avatar: const Icon(Icons.date_range_rounded, size: 16),
+                            label: Text(
+                              _dateRange != null
+                                  ? '${DateFormat('dd MMM').format(_dateRange!.start)} - ${DateFormat('dd MMM yyyy').format(_dateRange!.end)}'
+                                  : 'Pick dates',
                             ),
-                            items: List.generate(
-                              12,
-                              (i) => DropdownMenuItem(
-                                value: i + 1,
-                                child: Text(
-                                  DateFormat(
-                                    'MMMM',
-                                  ).format(DateTime(2000, i + 1)),
+                            onPressed: _pickDateRange,
+                          ),
+                        ] else ...[
+                          SizedBox(
+                            width: 160,
+                            child: DropdownButtonFormField<int>(
+                              initialValue: _month,
+                              decoration: const InputDecoration(
+                                labelText: 'Month',
+                                isDense: true,
+                              ),
+                              items: List.generate(
+                                12,
+                                (i) => DropdownMenuItem(
+                                  value: i + 1,
+                                  child: Text(
+                                    DateFormat(
+                                      'MMMM',
+                                    ).format(DateTime(2000, i + 1)),
+                                  ),
                                 ),
                               ),
+                              onChanged: (v) {
+                                setState(() => _month = v!);
+                                _loadReport();
+                              },
                             ),
-                            onChanged: (v) {
-                              setState(() => _month = v!);
-                              _loadReport();
-                            },
                           ),
-                        ),
-                        SizedBox(
-                          width: 120,
-                          child: DropdownButtonFormField<int>(
-                            initialValue: _year,
-                            decoration: const InputDecoration(
-                              labelText: 'Year',
-                              isDense: true,
-                            ),
-                            items: List.generate(
-                              5,
-                              (i) => DropdownMenuItem(
-                                value: DateTime.now().year - i,
-                                child: Text('${DateTime.now().year - i}'),
+                          SizedBox(
+                            width: 120,
+                            child: DropdownButtonFormField<int>(
+                              initialValue: _year,
+                              decoration: const InputDecoration(
+                                labelText: 'Year',
+                                isDense: true,
                               ),
+                              items: List.generate(
+                                5,
+                                (i) => DropdownMenuItem(
+                                  value: DateTime.now().year - i,
+                                  child: Text('${DateTime.now().year - i}'),
+                                ),
+                              ),
+                              onChanged: (v) {
+                                setState(() => _year = v!);
+                                _loadReport();
+                              },
                             ),
-                            onChanged: (v) {
-                              setState(() => _year = v!);
-                              _loadReport();
-                            },
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 24),
